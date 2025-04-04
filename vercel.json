@@ -1,13 +1,15 @@
 {
-    "version": 2,
-    "builds": [
-      { "src": "*.html", "use": "@vercel/static" },
-      { "src": "*.css", "use": "@vercel/static" },
-      { "src": "*.js", "use": "@vercel/static" },
-      { "src": "api/proxy.js", "use": "@vercel/node" }
-    ],
-    "routes": [
-      { "src": "/api/proxy", "dest": "/api/proxy.js" },
-      { "src": "/(.*)", "dest": "/$1" }
-    ]
-  }
+  "version": 2,
+  "builds": [
+    { "src": "*.html", "use": "@vercel/static" },
+    { "src": "*.css", "use": "@vercel/static" },
+    { "src": "*.js", "use": "@vercel/static" },
+    { "src": "api/proxy.js", "use": "@vercel/node" },
+    { "src": "api/streaming-proxy.js", "use": "@vercel/edge" }
+  ],
+  "routes": [
+    { "src": "/api/proxy", "dest": "/api/proxy.js" },
+    { "src": "/api/streaming-proxy", "dest": "/api/streaming-proxy.js" },
+    { "src": "/(.*)", "dest": "/$1" }
+  ]
+}

@@ -80,12 +80,20 @@ button:hover:not(:disabled) {
     border-radius: 8px;
     background-color: #f8f8f8;
     white-space: pre-wrap;
+    max-height: 300px;
+    overflow-y: auto;
 }
 
 .segment {
     padding: 8px;
     margin-bottom: 8px;
     border-radius: 8px;
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .speaker-0 {
@@ -109,6 +117,8 @@ button:hover:not(:disabled) {
     border-radius: 8px;
     background-color: #f8f8fa;
     border-left: 4px solid #0071e3;
+    max-height: 300px;
+    overflow-y: auto;
 }
 
 .analysis-content h3 {
@@ -129,4 +139,51 @@ button:hover:not(:disabled) {
 
 .analysis-content li {
     margin-bottom: 4px;
+}
+
+/* Mode toggle */
+.mode-toggle {
+    display: flex;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+.mode-toggle label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+/* Streaming vs batch mode indicator */
+.mode-indicator {
+    text-align: center;
+    font-size: 12px;
+    color: #666;
+    margin-top: 5px;
+}
+
+/* Style for interim results */
+.interim-result {
+    background-color: #f0f0f0;
+    border-left: 4px dashed #999;
+    font-style: italic;
+    opacity: 0.8;
+}
+
+/* Real-time indicator */
+.live-indicator {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    background-color: #ff3b30;
+    border-radius: 50%;
+    margin-right: 6px;
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    0% { opacity: 1; }
+    50% { opacity: 0.3; }
+    100% { opacity: 1; }
 }

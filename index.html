@@ -3,19 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice Processing with Deepgram and Groq</title>
+    <title>Real-time Voice Processing</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <h1>Voice Processing App</h1>
+    <h1>Real-time Voice Processing</h1>
     
     <div class="container">
         <div class="controls">
             <button id="recordBtn" class="record-btn">Start Recording</button>
             <button id="stopBtn" disabled>Stop Recording</button>
-            <button id="transcribeBtn" disabled>Transcribe & Analyze</button>
             <div id="timer">00:00</div>
             <div id="status">Ready to record</div>
+            <div class="mode-toggle">
+                <label>
+                    <input type="checkbox" id="streamingToggle" checked>
+                    Enable real-time streaming
+                </label>
+            </div>
         </div>
     </div>
     
@@ -29,6 +34,6 @@
         <div id="analysis" class="analysis-content">No analysis yet</div>
     </div>
     
-    <script src="script.js"></script>
+    <script src="streaming-script.js"></script>
 </body>
 </html>
