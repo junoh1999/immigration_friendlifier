@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Processing with Deepgram and Groq</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>Voice Processing App</h1>
+    
+    <div class="container">
+        <div class="controls">
+            <button id="recordBtn" class="record-btn">Start Recording</button>
+            <button id="stopBtn" disabled>Stop Recording</button>
+            <button id="transcribeBtn" disabled>Transcribe & Analyze</button>
+            <div id="timer">00:00</div>
+            <div id="status">Ready to record</div>
+        </div>
+    </div>
+    
+    <div class="container">
+        <h2>Transcription</h2>
+        <div id="transcription">No transcription yet</div>
+    </div>
+    
+    <div class="container">
+        <h2>AI Analysis</h2>
+        <div id="analysis" class="analysis-content">No analysis yet</div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>

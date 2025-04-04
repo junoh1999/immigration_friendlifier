@@ -1,0 +1,167 @@
+// Serverless function that runs on Vercel
+// Handles Deepgram transcription and Groq LLM processing
+
+module.exports = async (req, res) => {
+  // Set CORS headers
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+
+  // Handle preflight OPTIONS request
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  // Get API keys from environment variables
+  const deepgramApiKey = process.env.DEEPGRAM_API_KEY;
+  const groqApiKey = process.env.GROQ_API_KEY;
+  
+  if (!deepgramApiKey || !groqApiKey) {
+    return res.status(500).json({ 
+      error: "Server configuration error: Missing API key(s)" 
+    });
+  }
+
+  try {
+    if (req.method === "POST") {
+      // Check if we're handling a transcription request
+      if (req.query.type === "transcribe") {
+        const { audioData } = req.body;
+        
+        if (!audioData) {
+          return res.status(400).json({ error: "Missing audio data" });
+        }
+
+        // Extract the base64 data part (remove the prefix like "data:audio/webm;base64,")
+        const base64Data = audioData.split(",")[1];
+        const audioBuffer = Buffer.from(base64Data, "base64");
+
+        // Send to Deepgram API
+        const deepgramResponse = await fetch("https://api.deepgram.com/v1/listen?smart_format=true&diarize=true&punctuate=true", {
+          method: "POST",
+          headers: {
+            "Authorization": `Token ${deepgramApiKey}`,
+            "Content-Type": "audio/webm" // Adjust based on the audio format from the frontend
+          },
+          body: audioBuffer
+        });
+
+        if (!deepgramResponse.ok) {
+          const errorData = await deepgramResponse.text();
+          console.error("Deepgram API error:", errorData);
+          return res.status(deepgramResponse.status).json({ 
+            error: "Transcription failed", 
+            details: errorData 
+          });
+        }
+
+        // Get the transcription results
+        const transcriptionData = await deepgramResponse.json();
+        const transcript = transcriptionData.results?.channels[0]?.alternatives[0]?.transcript || "";
+        
+        // Format the segments with speaker diarization
+        const segments = transcriptionData.results?.channels[0]?.alternatives[0]?.words?.map(word => ({
+          text: word.word,
+          start: word.start,
+          end: word.end,
+          speaker: word.speaker || 0
+        })) || [];
+
+        // Group words by speaker and create cohesive segments
+        const formattedSegments = [];
+        let currentSegment = { text: "", start: 0, end: 0, speaker: -1 };
+
+        segments.forEach(word => {
+          if (currentSegment.speaker === -1) {
+            // First word
+            currentSegment = { 
+              text: word.text, 
+              start: word.start, 
+              end: word.end, 
+              speaker: word.speaker 
+            };
+          } else if (currentSegment.speaker === word.speaker) {
+            // Same speaker, append to current segment
+            currentSegment.text += " " + word.text;
+            currentSegment.end = word.end;
+          } else {
+            // New speaker, push the current segment and start a new one
+            formattedSegments.push(currentSegment);
+            currentSegment = { 
+              text: word.text, 
+              start: word.start, 
+              end: word.end, 
+              speaker: word.speaker 
+            };
+          }
+        });
+
+        // Add the last segment
+        if (currentSegment.speaker !== -1) {
+          formattedSegments.push(currentSegment);
+        }
+
+        // Process with Groq LLM if there's transcription text
+        let llmResponse = null;
+        if (transcript.trim()) {
+          try {
+            const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${groqApiKey}`,
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                model: "llama3-8b-8192", // Using Llama 3 8B model
+                messages: [
+                  {
+                    role: "system",
+                    content: "You are an AI assistant that summarizes and analyses spoken text. Extract key points, identify topics, and provide insights."
+                  },
+                  {
+                    role: "user",
+                    content: `Analyze the following transcription: "${transcript}"`
+                  }
+                ],
+                temperature: 0.7,
+                max_tokens: 500
+              })
+            });
+
+            if (groqResponse.ok) {
+              const groqData = await groqResponse.json();
+              llmResponse = groqData.choices?.[0]?.message?.content || null;
+            } else {
+              console.error("Groq API error:", await groqResponse.text());
+            }
+          } catch (groqError) {
+            console.error("Error processing with LLM:", groqError);
+          }
+        }
+
+        // Return the complete data
+        return res.status(200).json({
+          status: "succeeded",
+          output: {
+            transcript,
+            segments: formattedSegments,
+            llmAnalysis: llmResponse
+          }
+        });
+      }
+      
+      // If the request type is not specified or not recognized
+      return res.status(400).json({ error: "Invalid request type" });
+    }
+    
+    // If method is not POST
+    return res.status(405).json({ error: "Method not allowed" });
+    
+  } catch (error) {
+    console.error("Error in proxy function:", error);
+    return res.status(500).json({ 
+      error: "Internal Server Error", 
+      details: error.message 
+    });
+  }
+};

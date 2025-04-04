@@ -1,0 +1,9 @@
+{
+    "name": "whisperx-transcription-app",
+    "version": "1.0.0",
+    "private": true,
+    "engines": {
+      "node": ">=14.0.0"
+    },
+    "dependencies": {}
+  }
