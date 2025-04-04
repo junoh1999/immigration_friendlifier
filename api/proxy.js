@@ -36,8 +36,11 @@ module.exports = async (req, res) => {
         const base64Data = audioData.split(",")[1];
         const audioBuffer = Buffer.from(base64Data, "base64");
 
-        // Send to Deepgram API
-        const deepgramResponse = await fetch("https://api.deepgram.com/v1/listen?smart_format=true&diarize=true&punctuate=true", {
+        // Log audio info for debugging
+        console.log(`Audio data received: ${audioBuffer.length} bytes`);
+
+        // Send to Deepgram API with explicit diarization parameters
+        const deepgramResponse = await fetch("https://api.deepgram.com/v1/listen?smart_format=true&diarize=true&punctuate=true&model=nova-2&utterances=true", {
           method: "POST",
           headers: {
             "Authorization": `Token ${deepgramApiKey}`,
@@ -57,49 +60,50 @@ module.exports = async (req, res) => {
 
         // Get the transcription results
         const transcriptionData = await deepgramResponse.json();
+        
+        // Log the full response for debugging
+        console.log("Deepgram response:", JSON.stringify(transcriptionData, null, 2));
+        
+        // Get the transcript
         const transcript = transcriptionData.results?.channels[0]?.alternatives[0]?.transcript || "";
         
-        // Format the segments with speaker diarization
-        const segments = transcriptionData.results?.channels[0]?.alternatives[0]?.words?.map(word => ({
-          text: word.word,
-          start: word.start,
-          end: word.end,
-          speaker: word.speaker || 0
-        })) || [];
-
-        // Group words by speaker and create cohesive segments
+        // Get the words with speaker information
+        const words = transcriptionData.results?.channels[0]?.alternatives[0]?.words || [];
+        
+        // Group words by speaker into cohesive segments
         const formattedSegments = [];
         let currentSegment = { text: "", start: 0, end: 0, speaker: -1 };
-
-        segments.forEach(word => {
-          if (currentSegment.speaker === -1) {
-            // First word
-            currentSegment = { 
-              text: word.text, 
-              start: word.start, 
-              end: word.end, 
-              speaker: word.speaker 
+        
+        // Process each word
+        words.forEach(word => {
+          // If this is the first word or the speaker has changed
+          if (currentSegment.speaker === -1 || currentSegment.speaker !== word.speaker) {
+            // If we already have content in the current segment, push it to the array
+            if (currentSegment.speaker !== -1) {
+              formattedSegments.push(currentSegment);
+            }
+            
+            // Start a new segment
+            currentSegment = {
+              text: word.word,
+              start: word.start,
+              end: word.end,
+              speaker: word.speaker
             };
-          } else if (currentSegment.speaker === word.speaker) {
-            // Same speaker, append to current segment
-            currentSegment.text += " " + word.text;
-            currentSegment.end = word.end;
           } else {
-            // New speaker, push the current segment and start a new one
-            formattedSegments.push(currentSegment);
-            currentSegment = { 
-              text: word.text, 
-              start: word.start, 
-              end: word.end, 
-              speaker: word.speaker 
-            };
+            // Same speaker, append to current segment
+            currentSegment.text += " " + word.word;
+            currentSegment.end = word.end;
           }
         });
-
-        // Add the last segment
+        
+        // Add the last segment if there is one
         if (currentSegment.speaker !== -1) {
           formattedSegments.push(currentSegment);
         }
+        
+        // Log the segments for debugging
+        console.log("Formatted segments:", JSON.stringify(formattedSegments, null, 2));
 
         // Process with Groq LLM if there's transcription text
         let llmResponse = null;
@@ -116,11 +120,11 @@ module.exports = async (req, res) => {
                 messages: [
                   {
                     role: "system",
-                    content: "You are an AI assistant that summarizes and analyses spoken text. Extract key points, identify topics, and provide insights."
+                    content: "You are an AI assistant that summarizes and analyses spoken text. Extract key points, identify topics, and provide insights from conversations."
                   },
                   {
                     role: "user",
-                    content: `Analyze the following transcription: "${transcript}"`
+                    content: `Analyze the following transcription of a conversation: "${transcript}"`
                   }
                 ],
                 temperature: 0.7,
