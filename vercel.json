@@ -5,7 +5,7 @@
     { "src": "*.css", "use": "@vercel/static" },
     { "src": "*.js", "use": "@vercel/static" },
     { "src": "api/proxy.js", "use": "@vercel/node" },
-    { "src": "api/streaming-proxy.js", "use": "@vercel/edge" }
+    { "src": "api/streaming-proxy.js", "use": "@vercel/node" }
   ],
   "routes": [
     { "src": "/api/proxy", "dest": "/api/proxy.js" },
