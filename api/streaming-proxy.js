@@ -75,7 +75,7 @@ module.exports = async (req, res) => {
         });
         // Create channels
         const fromClientChannel = ablyClient.channels.get('request-channel');
-        const broadcastChannel = ablyClient.channels.get('broadcast-channel');
+        const broadcastChannel = ablyClient.channels.get('transcript-channel');
         
         // Set up listeners
         deepgramLive.addListener("transcriptReceived", (transcription) => {
@@ -86,7 +86,15 @@ module.exports = async (req, res) => {
             const transcript = data.channel.alternatives[0].transcript;
             if (transcript) {
               // Publish to Ably
-              broadcastChannel.publish(sessionId, transcript);
+              broadcastChannel.publish('transcription', {
+                sessionId: sessionId,
+                segments: [{ 
+                  text: transcript,
+                  start: Date.now() / 1000, // Approximate timestamp
+                  end: Date.now() / 1000,
+                  speaker: 0 // Default speaker 
+                }]
+              });
               
               // If significant transcript, also process with Groq
               if (transcript.length > 10) {
