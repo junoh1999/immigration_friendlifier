@@ -314,11 +314,23 @@ async function sendForBatchTranscription(audioBlob) {
 function handleTranscriptionMessage(message) {
     if (message.data.sessionId !== sessionId) return;
     
-    const data = message.data;
-    
-    // Update the display with new segments
-    if (data.segments && data.segments.length > 0) {
-        updateTranscription(data.segments);
+    let transcriptData = message.data;
+    if (typeof transcriptData === 'string') {
+        // Handle old format (just text)
+        updateTranscription([{
+            text: transcriptData,
+            speaker: 0, 
+            start: 0,
+            end: 0
+        }]);
+    } else {
+        // Handle new format with speaker info
+        updateTranscription([{
+            text: transcriptData.text,
+            speaker: transcriptData.speaker,
+            start: transcriptData.start,
+            end: transcriptData.end
+        }]);
     }
 }
 
