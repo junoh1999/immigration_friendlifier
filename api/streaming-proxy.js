@@ -69,13 +69,14 @@ module.exports = async (req, res) => {
         const deepgramLive = deepgram.transcription.live({
           punctuate: true,
           smart_format: true,
-          diarize: true,           // Add this line
-          min_speakers: 2,         // Optional: Set minimum speakers
-          max_speakers: 6,         // Optional: Set maximum speakers (adjust as needed)
+          diarize: true,
+          min_speakers: 2,
+          max_speakers: 6,
           encoding: "linear16",
           sample_rate: 16000,
           channels: 1
-      });
+        });
+        
         // Create channels
         const fromClientChannel = ablyClient.channels.get('request-channel');
         const broadcastChannel = ablyClient.channels.get('transcript-channel');
@@ -83,38 +84,36 @@ module.exports = async (req, res) => {
         // Set up listeners
         deepgramLive.addListener("transcriptReceived", (transcription) => {
           try {
-              const data = JSON.parse(transcription);
-              if (data.channel == null) return;
-              
-              const transcript = data.channel.alternatives[0].transcript;
-              if (!transcript) return;
-              
-              // Extract speaker information if available
-              let speakerId = 0;
-              if (data.channel.alternatives[0].words && 
-                  data.channel.alternatives[0].words.length > 0) {
-                  speakerId = data.channel.alternatives[0].words[0].speaker;
-              }
-              
-              // Create a structured message with text and speaker info
-              const messageData = {
-                  text: transcript,
-                  speaker: speakerId,
-                  start: data.start,
-                  end: data.end
-              };
-              
-              // Publish to Ably
-              broadcastChannel.publish(member.clientId, messageData);
-              
-              // If significant transcript, also process with Groq
-              if (transcript.length > 10) {
-                  processWithGroq(transcript, sessionId);
-              }
+            const data = JSON.parse(transcription);
+            if (data.channel == null) return;
+            
+            const transcript = data.channel.alternatives[0].transcript;
+            if (!transcript || transcript.trim() === '') return;
+            
+            // Extract speaker information if available
+            let speakerId = 0;
+            if (data.channel.alternatives[0].words && 
+                data.channel.alternatives[0].words.length > 0) {
+                speakerId = data.channel.alternatives[0].words[0].speaker;
+            }
+            
+            // Send transcript with speaker info
+            broadcastChannel.publish('transcription', {
+              sessionId: sessionId,
+              text: transcript,
+              speaker: speakerId,
+              start: data.start,
+              end: data.end
+            });
+            
+            // If significant transcript, also process with Groq
+            if (transcript.length > 10) {
+              processWithGroq(transcript, sessionId);
+            }
           } catch (error) {
-              console.error('Error processing transcript:', error);
+            console.error('Error processing transcript:', error);
           }
-      });
+        });
         
         deepgramLive.addListener("error", (err) => {
           console.error('Deepgram error:', err);
