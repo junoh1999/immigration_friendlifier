@@ -8,15 +8,15 @@ const analysisEl = document.getElementById('analysis');
 
 // Global variables
 let mediaRecorder;
-let audioChunks = [];
+let audioContext;
+let audioProcessor;
 let recordingStartTime;
 let timerInterval;
-let audioBlob;
 let isRecording = false;
-let ablyClient;
-let ablyChannel;
-let sessionId = generateSessionId();
-let streamingEnabled = true;
+let sessionId = generateUniqueId();
+let ablyClient = null;
+let transcriptChannel = null;
+let analysisChannel = null;
 
 // Check for browser support
 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -25,60 +25,7 @@ if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     recordBtn.disabled = true;
 }
 
-// Initialize Ably connection
-async function initializeAbly() {
-    try {
-        // Load the Ably library
-        await loadScript('https://cdn.ably.io/lib/ably.min-1.js');
-        
-        // Get a token from our backend
-        const response = await fetch('/api/streaming-proxy');
-        if (!response.ok) {
-            throw new Error('Failed to get Ably token');
-        }
-        
-        const tokenRequest = await response.json();
-        
-        // Initialize Ably with the token
-        ablyClient = new Ably.Realtime({ authCallback: (_, callback) => callback(null, tokenRequest) });
-        
-        // Setup channel and subscribe to messages
-        ablyChannel = ablyClient.channels.get('deepgram-channel');
-        
-        // Listen for transcription updates
-        ablyChannel.subscribe('transcription', (message) => {
-            if (message.data.sessionId === sessionId) {
-                handleTranscriptionUpdate(message.data.result);
-            }
-        });
-        
-        // Listen for analysis updates
-        ablyChannel.subscribe('analysis', (message) => {
-            if (message.data.sessionId === sessionId) {
-                displayAnalysis(message.data.analysis);
-                updateTranscription(message.data.segments);
-            }
-        });
-        
-        ablyClient.connection.on('connected', () => {
-            console.log('Connected to Ably');
-            streamingEnabled = true;
-        });
-        
-        ablyClient.connection.on('failed', () => {
-            console.log('Ably connection failed, using fallback');
-            streamingEnabled = false;
-        });
-        
-        return true;
-    } catch (error) {
-        console.error('Error initializing Ably:', error);
-        streamingEnabled = false;
-        return false;
-    }
-}
-
-// Initialize Ably when the page loads
+// Initialize Ably
 initializeAbly();
 
 // Event listeners
@@ -93,9 +40,56 @@ stopBtn.addEventListener('click', function() {
 });
 
 // Functions
+async function initializeAbly() {
+    try {
+        // Load Ably script dynamically
+        await loadScript('https://cdn.ably.io/lib/ably.min-1.js');
+        
+        // Get token from our backend
+        const response = await fetch('/api/streaming-proxy');
+        if (!response.ok) {
+            throw new Error('Failed to get Ably token');
+        }
+        
+        const data = await response.json();
+        
+        // Initialize Ably with token
+        ablyClient = new Ably.Realtime({
+            authCallback: (_, callback) => {
+                callback(null, data.tokenRequest);
+            }
+        });
+        
+        // Subscribe to transcript channel
+        transcriptChannel = ablyClient.channels.get('transcript-channel');
+        transcriptChannel.subscribe('transcription', handleTranscriptionMessage);
+        
+        // Subscribe to analysis channel
+        analysisChannel = ablyClient.channels.get('analysis-channel');
+        analysisChannel.subscribe('analysis', handleAnalysisMessage);
+        
+        console.log('Ably initialized successfully');
+        
+        ablyClient.connection.on('connected', () => {
+            console.log('Connected to Ably realtime');
+            statusEl.textContent = 'Ready to record (streaming mode)';
+        });
+        
+        ablyClient.connection.on('failed', (error) => {
+            console.error('Ably connection failed:', error);
+            statusEl.textContent = 'Streaming not available, using batch mode';
+        });
+        
+    } catch (error) {
+        console.error('Error initializing Ably:', error);
+        statusEl.textContent = 'Streaming not available, using batch mode';
+    }
+}
+
 async function startRecording() {
     console.log('Starting recording...');
     try {
+        // Get audio stream with required sample rate
         const stream = await navigator.mediaDevices.getUserMedia({ 
             audio: {
                 echoCancellation: true,
@@ -109,14 +103,16 @@ async function startRecording() {
         transcriptionEl.innerHTML = '';
         if (analysisEl) analysisEl.innerHTML = '';
         
-        // Generate a new session ID
-        sessionId = generateSessionId();
+        // Generate a new session ID for this recording
+        sessionId = generateUniqueId();
         
-        // Check if streaming is enabled
-        if (streamingEnabled && ablyClient && ablyClient.connection.state === 'connected') {
-            setupStreamingRecorder(stream);
+        // Check if Ably is connected
+        if (ablyClient && ablyClient.connection.state === 'connected') {
+            // Use streaming mode
+            setupStreamingAudio(stream);
         } else {
-            setupBatchRecorder(stream);
+            // Fall back to batch mode
+            setupBatchRecording(stream);
         }
         
         recordingStartTime = Date.now();
@@ -124,7 +120,8 @@ async function startRecording() {
         
         recordBtn.disabled = true;
         stopBtn.disabled = false;
-        statusEl.textContent = streamingEnabled ? 'Recording (streaming mode)...' : 'Recording (batch mode)...';
+        statusEl.textContent = (ablyClient && ablyClient.connection.state === 'connected') ? 
+            'Recording (streaming mode)...' : 'Recording (batch mode)...';
         recordBtn.classList.add('recording');
         isRecording = true;
         
@@ -138,8 +135,17 @@ function stopRecording() {
     console.log('Stopping recording...');
     isRecording = false;
     
+    // Stop MediaRecorder if using batch mode
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         mediaRecorder.stop();
+    }
+    
+    // Clean up AudioContext if using streaming mode
+    if (audioContext && audioContext.state !== 'closed') {
+        if (audioProcessor) {
+            audioProcessor.disconnect();
+        }
+        audioContext.close();
     }
     
     clearInterval(timerInterval);
@@ -149,66 +155,89 @@ function stopRecording() {
     recordBtn.classList.remove('recording');
 }
 
-// Setup for streaming recording
-function setupStreamingRecorder(stream) {
-    // Create a smaller time slice for more frequent chunks
-    mediaRecorder = new MediaRecorder(stream);
-    let isFirstChunk = true;
-    let chunkCount = 0;
-    
-    mediaRecorder.ondataavailable = async (event) => {
-        if (event.data.size > 0) {
-            // Convert the blob to base64
-            const reader = new FileReader();
-            reader.readAsDataURL(event.data);
+// Set up streaming audio processing
+function setupStreamingAudio(stream) {
+    try {
+        // Create audio context with 16kHz sample rate (ideal for speech recognition)
+        audioContext = new (window.AudioContext || window.webkitAudioContext)({
+            sampleRate: 16000
+        });
+        
+        // Create a source node from the stream
+        const source = audioContext.createMediaStreamSource(stream);
+        
+        // Create script processor node for processing audio data
+        // Note: ScriptProcessorNode is deprecated but still works in all browsers
+        // AudioWorklet would be better but has less support
+        audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
+        
+        // Flag to track if we've sent the first chunk
+        let isFirstChunk = true;
+        
+        // Process audio data
+        audioProcessor.onaudioprocess = async (audioProcessingEvent) => {
+            if (!isRecording) return;
             
-            reader.onloadend = async () => {
-                // Extract the base64 part
-                const base64Audio = reader.result.split(',')[1];
+            // Get the raw audio data
+            const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
+            
+            // Convert to the format needed by Deepgram (16-bit PCM)
+            const pcmData = convertFloat32ToInt16(inputData);
+            
+            // Convert to base64 for sending over HTTP
+            const base64Audio = arrayBufferToBase64(pcmData.buffer);
+            
+            // Send to our backend
+            try {
+                const response = await fetch('/api/streaming-proxy', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        sessionId: sessionId,
+                        audioData: base64Audio,
+                        isFirstChunk: isFirstChunk
+                    })
+                });
                 
-                // Send to our backend
-                try {
-                    await fetch('/api/streaming-proxy', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            audioChunk: base64Audio,
-                            sessionId: sessionId,
-                            isFirstChunk: isFirstChunk
-                        })
-                    });
-                    
+                // Update first chunk flag
+                if (isFirstChunk) {
                     isFirstChunk = false;
-                    chunkCount++;
-                    
-                    // Update status occasionally
-                    if (chunkCount % 5 === 0) {
-                        statusEl.textContent = `Streaming... (${chunkCount} chunks sent)`;
-                    }
-                } catch (error) {
-                    console.error('Error sending audio chunk:', error);
+                }
+                
+                if (!response.ok) {
+                    console.error('Error sending audio:', await response.text());
+                }
+            } catch (error) {
+                console.error('Error sending audio to server:', error);
+            }
+        };
+        
+        // Connect the nodes
+        source.connect(audioProcessor);
+        audioProcessor.connect(audioContext.destination);
+        
+        // Make sure streams are cleaned up when recording stops
+        stream.getAudioTracks().forEach(track => {
+            track.onended = () => {
+                if (isRecording) {
+                    stopRecording();
                 }
             };
-        }
-    };
-    
-    mediaRecorder.onstop = () => {
-        // Stop all tracks in the stream to release the microphone
-        stream.getTracks().forEach(track => track.stop());
-        statusEl.textContent = 'Recording stopped. Processing final transcription...';
-    };
-    
-    // Start recording with 1-second time slices
-    mediaRecorder.start(1000);
-    console.log('MediaRecorder started in streaming mode');
+        });
+        
+    } catch (error) {
+        console.error('Error setting up audio streaming:', error);
+        // Fall back to batch mode
+        setupBatchRecording(stream);
+    }
 }
 
-// Setup for batch recording
-function setupBatchRecorder(stream) {
+// Set up batch recording (fallback)
+function setupBatchRecording(stream) {
     mediaRecorder = new MediaRecorder(stream);
-    audioChunks = [];
+    let audioChunks = [];
     
     mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -217,7 +246,7 @@ function setupBatchRecorder(stream) {
     };
     
     mediaRecorder.onstop = () => {
-        audioBlob = new Blob(audioChunks);
+        const audioBlob = new Blob(audioChunks);
         console.log('Recording stopped. Audio type:', audioBlob.type, 'Size:', audioBlob.size);
         
         // Send for batch transcription
@@ -231,7 +260,7 @@ function setupBatchRecorder(stream) {
     console.log('MediaRecorder started in batch mode');
 }
 
-// Send audio for batch transcription
+// Send audio for batch transcription (original flow)
 async function sendForBatchTranscription(audioBlob) {
     if (!audioBlob) {
         console.log('No audio blob available');
@@ -281,55 +310,25 @@ async function sendForBatchTranscription(audioBlob) {
     }
 }
 
-// Handle real-time transcription updates
-function handleTranscriptionUpdate(data) {
-    if (!data || !data.results || !data.results.channels || 
-        !data.results.channels[0] || !data.results.channels[0].alternatives || 
-        !data.results.channels[0].alternatives[0]) {
-        return;
+// Handle transcription messages from Ably
+function handleTranscriptionMessage(message) {
+    if (message.data.sessionId !== sessionId) return;
+    
+    const data = message.data;
+    
+    // Update the display with new segments
+    if (data.segments && data.segments.length > 0) {
+        updateTranscription(data.segments);
     }
+}
+
+// Handle analysis messages from Ably
+function handleAnalysisMessage(message) {
+    if (message.data.sessionId !== sessionId) return;
     
-    const alternative = data.results.channels[0].alternatives[0];
-    const transcript = alternative.transcript;
-    
-    if (transcript && transcript.trim() !== '') {
-        // Update status
-        statusEl.textContent = 'Receiving transcription...';
-        
-        // Process the words to get speaker information
-        const words = alternative.words || [];
-        
-        if (words.length > 0) {
-            // Group words by speaker
-            let segments = [];
-            let currentSegment = null;
-            
-            for (const word of words) {
-                if (!currentSegment || currentSegment.speaker !== word.speaker) {
-                    if (currentSegment) {
-                        segments.push(currentSegment);
-                    }
-                    currentSegment = {
-                        text: word.word,
-                        start: word.start,
-                        end: word.end,
-                        speaker: word.speaker || 0
-                    };
-                } else {
-                    // Same speaker, add to current segment
-                    currentSegment.text += " " + word.word;
-                    currentSegment.end = word.end;
-                }
-            }
-            
-            // Add the last segment
-            if (currentSegment) {
-                segments.push(currentSegment);
-            }
-            
-            // Update the display
-            updateTranscription(segments);
-        }
+    const analysis = message.data.analysis;
+    if (analysis) {
+        displayAnalysis(analysis);
     }
 }
 
@@ -344,12 +343,12 @@ function updateTranscription(segments) {
     
     // Process each segment
     segments.forEach(segment => {
-        // Check if we already have this segment (by time range and text)
+        // Check if we already have this segment based on time and text
         const existingSegments = Array.from(transcriptionEl.querySelectorAll('.segment'));
         const segmentExists = existingSegments.some(el => {
-            const start = parseFloat(el.dataset.start);
-            const end = parseFloat(el.dataset.end);
-            const text = el.querySelector('div:not(.segment-header)').textContent;
+            const start = parseFloat(el.dataset.start || 0);
+            const end = parseFloat(el.dataset.end || 0);
+            const text = el.querySelector('div:not(.segment-header)')?.textContent || '';
             
             return Math.abs(start - segment.start) < 0.1 && 
                   Math.abs(end - segment.end) < 0.1 && 
@@ -480,7 +479,7 @@ function formatTime(seconds) {
     return `${mins}:${secs}`;
 }
 
-function generateSessionId() {
+function generateUniqueId() {
     return 'session-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
 }
 
@@ -492,6 +491,28 @@ function loadScript(url) {
         script.onerror = reject;
         document.head.appendChild(script);
     });
+}
+
+// Convert Float32Array to Int16Array (required format for Deepgram)
+function convertFloat32ToInt16(float32Array) {
+    const int16Array = new Int16Array(float32Array.length);
+    for (let i = 0; i < float32Array.length; i++) {
+        // Convert to 16-bit PCM
+        const s = Math.max(-1, Math.min(1, float32Array[i]));
+        int16Array[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    }
+    return int16Array;
+}
+
+// Convert ArrayBuffer to base64 string for transmission
+function arrayBufferToBase64(buffer) {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return window.btoa(binary);
 }
 
 console.log('Script loaded and initialized with Ably streaming support');
