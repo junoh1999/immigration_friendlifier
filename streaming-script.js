@@ -312,29 +312,19 @@ async function sendForBatchTranscription(audioBlob) {
 
 // Handle transcription messages from Ably
 function handleTranscriptionMessage(message) {
-    if (!message.data || message.data.sessionId !== sessionId) return;
+    if (message.data.sessionId !== sessionId) return;
     
-    console.log('Received transcription:', message.data);
+    const data = message.data;
     
-    const transcriptData = message.data;
-    
-    // Create segment object
-    const segment = {
-        text: transcriptData.text,
-        speaker: transcriptData.speaker || 0,
-        start: transcriptData.start || 0,
-        end: transcriptData.end || 0
-    };
-    
-    // Update the display with the new segment
-    updateTranscription([segment]);
+    // Update the display with new segments
+    if (data.segments && data.segments.length > 0) {
+        updateTranscription(data.segments);
+    }
 }
 
 // Handle analysis messages from Ably
 function handleAnalysisMessage(message) {
-    if (!message.data || message.data.sessionId !== sessionId) return;
-    
-    console.log('Received analysis:', message.data);
+    if (message.data.sessionId !== sessionId) return;
     
     const analysis = message.data.analysis;
     if (analysis) {
@@ -356,27 +346,26 @@ function updateTranscription(segments) {
         // Check if we already have this segment based on time and text
         const existingSegments = Array.from(transcriptionEl.querySelectorAll('.segment'));
         const segmentExists = existingSegments.some(el => {
+            const start = parseFloat(el.dataset.start || 0);
+            const end = parseFloat(el.dataset.end || 0);
             const text = el.querySelector('div:not(.segment-header)')?.textContent || '';
-            return text === segment.text;
+            
+            return Math.abs(start - segment.start) < 0.1 && 
+                  Math.abs(end - segment.end) < 0.1 && 
+                  text === segment.text;
         });
         
         if (!segmentExists) {
             const segmentDiv = document.createElement('div');
             const speakerId = segment.speaker;
             segmentDiv.className = `segment speaker-${speakerId % 2}`;
-            segmentDiv.style.backgroundColor = speakerId % 2 ? '#e6f7ff' : '#f0f7ff';
-            segmentDiv.style.padding = '10px';
-            segmentDiv.style.margin = '5px 0';
-            segmentDiv.style.borderRadius = '5px';
+            segmentDiv.dataset.start = segment.start;
+            segmentDiv.dataset.end = segment.end;
             
-            const timeStr = segment.start !== undefined ? 
-                `${formatTime(segment.start)} - ${formatTime(segment.end)}` : '';
-            
+            const timeStr = formatTime(segment.start) + ' - ' + formatTime(segment.end);
             const headerDiv = document.createElement('div');
             headerDiv.className = 'segment-header';
-            headerDiv.textContent = `Speaker ${speakerId} ${timeStr ? `(${timeStr})` : ''}`;
-            headerDiv.style.fontWeight = 'bold';
-            headerDiv.style.marginBottom = '5px';
+            headerDiv.textContent = `Speaker ${speakerId} (${timeStr})`;
             
             const textDiv = document.createElement('div');
             textDiv.textContent = segment.text;
@@ -402,19 +391,13 @@ function displayTranscription(segments) {
     
     segments.forEach(segment => {
         const segmentDiv = document.createElement('div');
-        const speakerId = segment.speaker || 0;
+        const speakerId = segment.speaker;
         segmentDiv.className = `segment speaker-${speakerId % 2}`;
-        segmentDiv.style.backgroundColor = speakerId % 2 ? '#e6f7ff' : '#f0f7ff';
-        segmentDiv.style.padding = '10px';
-        segmentDiv.style.margin = '5px 0';
-        segmentDiv.style.borderRadius = '5px';
         
         const timeStr = formatTime(segment.start) + ' - ' + formatTime(segment.end);
         const headerDiv = document.createElement('div');
         headerDiv.className = 'segment-header';
         headerDiv.textContent = `Speaker ${speakerId} (${timeStr})`;
-        headerDiv.style.fontWeight = 'bold';
-        headerDiv.style.marginBottom = '5px';
         
         const textDiv = document.createElement('div');
         textDiv.textContent = segment.text;
@@ -491,7 +474,6 @@ function updateTimer() {
 }
 
 function formatTime(seconds) {
-    if (seconds === undefined) return '00:00';
     const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
     const secs = Math.floor(seconds % 60).toString().padStart(2, '0');
     return `${mins}:${secs}`;

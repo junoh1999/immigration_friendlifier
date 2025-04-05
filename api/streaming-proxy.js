@@ -20,7 +20,7 @@ module.exports = async (req, res) => {
   if (!ablyClient) {
     try {
       ablyClient = new Ably.Realtime({
-        key: process.env.VITE_ABLY_API_KEY,
+        key: process.env.ABLY_API_KEY,
         clientId: 'server'
       });
       console.log('Ably client initialized');
@@ -64,23 +64,18 @@ module.exports = async (req, res) => {
       // If first chunk or session doesn't exist, create a new Deepgram session
       if (isFirstChunk || !deepgramSessions[sessionId]) {
         // Initialize Deepgram
-        const deepgram = new Deepgram(process.env.VITE_DEEPGRAM_API_KEY);
+        const deepgram = new Deepgram(process.env.DEEPGRAM_API_KEY);
         
         const deepgramLive = deepgram.transcription.live({
           punctuate: true,
           smart_format: true,
-          diarize: true,
-          min_speakers: 2,
-          max_speakers: 6,
           encoding: "linear16", // Use standard PCM format
           sample_rate: 16000,
           channels: 1
         });
-        
         // Create channels
         const fromClientChannel = ablyClient.channels.get('request-channel');
         const broadcastChannel = ablyClient.channels.get('transcript-channel');
-        const analysisChannel = ablyClient.channels.get('analysis-channel');
         
         // Set up listeners
         deepgramLive.addListener("transcriptReceived", (transcription) => {
@@ -89,27 +84,22 @@ module.exports = async (req, res) => {
             if (data.channel == null) return;
             
             const transcript = data.channel.alternatives[0].transcript;
-            if (!transcript || transcript.trim() === '') return;
-            
-            // Extract speaker information from words (if available)
-            let speakerId = 0;
-            if (data.channel.alternatives[0].words && 
-                data.channel.alternatives[0].words.length > 0) {
-              speakerId = data.channel.alternatives[0].words[0].speaker;
-            }
-            
-            // Send transcript with speaker info
-            broadcastChannel.publish('transcription', {
-              sessionId: sessionId,
-              text: transcript,
-              speaker: speakerId,
-              start: data.start,
-              end: data.end
-            });
-            
-            // If significant transcript, also process with Groq
-            if (transcript.length > 10) {
-              processWithGroq(transcript, sessionId, analysisChannel);
+            if (transcript) {
+              // Publish to Ably
+              broadcastChannel.publish('transcription', {
+                sessionId: sessionId,
+                segments: [{ 
+                  text: transcript,
+                  start: Date.now() / 1000, // Approximate timestamp
+                  end: Date.now() / 1000,
+                  speaker: 0 // Default speaker 
+                }]
+              });
+              
+              // If significant transcript, also process with Groq
+              if (transcript.length > 10) {
+                processWithGroq(transcript, sessionId);
+              }
             }
           } catch (error) {
             console.error('Error processing transcript:', error);
@@ -134,19 +124,12 @@ module.exports = async (req, res) => {
       
       // Send audio chunk to Deepgram
       if (audioData && deepgramSessions[sessionId]) {
-        try {
-          const base64String = audioData.split(',')[1] || audioData;
-          const audioBuffer = Buffer.from(base64String, 'base64');
-          
-          if (deepgramSessions[sessionId].deepgramLive.getReadyState() === 1) {
-            deepgramSessions[sessionId].deepgramLive.send(audioBuffer);
-            deepgramSessions[sessionId].lastActivity = Date.now();
-          } else {
-            console.log('Deepgram not ready, buffering data');
-            // Could implement a queue here if needed
-          }
-        } catch (audioError) {
-          console.error('Error processing audio data:', audioError);
+        const base64String = audioData.split(',')[1] || audioData;
+        const audioBuffer = Buffer.from(base64String, 'base64');
+        
+        if (deepgramSessions[sessionId].deepgramLive.getReadyState() === 1) {
+          deepgramSessions[sessionId].deepgramLive.send(audioBuffer);
+          deepgramSessions[sessionId].lastActivity = Date.now();
         }
       }
       
@@ -162,17 +145,12 @@ module.exports = async (req, res) => {
 };
 
 // Process transcript with Groq for analysis
-async function processWithGroq(transcript, sessionId, analysisChannel) {
+async function processWithGroq(transcript, sessionId) {
   try {
     if (!transcript || transcript.trim() === '') return;
     
-    const groqApiKey = process.env.GROQ_API_KEY;
-    if (!groqApiKey) {
-      console.warn('GROQ_API_KEY not found. Skipping analysis.');
-      return;
-    }
-    
     // Call Groq for analysis
+    const groqApiKey = process.env.GROQ_API_KEY;
     const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -201,15 +179,11 @@ async function processWithGroq(transcript, sessionId, analysisChannel) {
       const analysis = groqData.choices?.[0]?.message?.content || null;
       
       // Publish analysis to Ably
-      if (analysis) {
-        await analysisChannel.publish('analysis', {
-          sessionId,
-          analysis
-        });
-        console.log('Analysis published to Ably');
-      }
-    } else {
-      console.error('Groq API error:', await groqResponse.text());
+      const analysisChannel = ablyClient.channels.get('analysis-channel');
+      await analysisChannel.publish('analysis', {
+        sessionId,
+        analysis
+      });
     }
   } catch (error) {
     console.error('Error processing with Groq:', error);
