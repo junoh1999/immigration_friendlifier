@@ -66,14 +66,13 @@ module.exports = async (req, res) => {
         // Initialize Deepgram
         const deepgram = new Deepgram(process.env.DEEPGRAM_API_KEY);
         
-        // Create a live transcription session
         const deepgramLive = deepgram.transcription.live({
           punctuate: true,
           smart_format: true,
-          encoding: "webm", // Use the correct encoding for your audio format
-          sample_rate: 16000
+          encoding: "linear16", // Use standard PCM format
+          sample_rate: 16000,
+          channels: 1
         });
-        
         // Create channels
         const fromClientChannel = ablyClient.channels.get('request-channel');
         const broadcastChannel = ablyClient.channels.get('broadcast-channel');
