@@ -82,38 +82,33 @@ module.exports = async (req, res) => {
         const broadcastChannel = ablyClient.channels.get('transcript-channel');
         
         // Set up listeners
-        deepgramLive.addListener("transcriptReceived", (transcription) => {
-          try {
-            const data = JSON.parse(transcription);
-            if (data.channel == null) return;
-            
-            const transcript = data.channel.alternatives[0].transcript;
-            if (!transcript || transcript.trim() === '') return;
-            
-            // Extract speaker information if available
-            let speakerId = 0;
-            if (data.channel.alternatives[0].words && 
-                data.channel.alternatives[0].words.length > 0) {
-                speakerId = data.channel.alternatives[0].words[0].speaker;
-            }
-            
-            // Send transcript with speaker info
-            broadcastChannel.publish('transcription', {
-              sessionId: sessionId,
-              text: transcript,
-              speaker: speakerId,
-              start: data.start,
-              end: data.end
-            });
-            
-            // If significant transcript, also process with Groq
-            if (transcript.length > 10) {
-              processWithGroq(transcript, sessionId);
-            }
-          } catch (error) {
-            console.error('Error processing transcript:', error);
-          }
-        });
+// In your streaming-proxy.js, update the transcriptReceived handler
+
+deepgramLive.addListener("transcriptReceived", (transcription) => {
+  try {
+    const data = JSON.parse(transcription);
+    if (data.channel == null) return;
+    
+    const transcript = data.channel.alternatives[0].transcript;
+    if (!transcript || transcript.trim() === '') return;
+    
+    // SIMPLIFIED: Just publish the transcript text directly like before
+    // This should work similar to your non-diarization version
+    broadcastChannel.publish('transcription', {
+      sessionId: sessionId,
+      text: transcript
+      // No speaker info for now, just to test if basic transcription works
+    });
+    
+    console.log(`Published transcript: "${transcript}"`);
+    
+    if (transcript.length > 10) {
+      processWithGroq(transcript, sessionId);
+    }
+  } catch (error) {
+    console.error('Error processing transcript:', error);
+  }
+});
         
         deepgramLive.addListener("error", (err) => {
           console.error('Deepgram error:', err);
