@@ -312,27 +312,24 @@ async function sendForBatchTranscription(audioBlob) {
 
 // Handle transcription messages from Ably
 function handleTranscriptionMessage(message) {
-    if (message.data.sessionId !== sessionId) return;
+    if (!message.data || message.data.sessionId !== sessionId) return;
     
-    let transcriptData = message.data;
-    if (typeof transcriptData === 'string') {
-        // Handle old format (just text)
-        updateTranscription([{
-            text: transcriptData,
-            speaker: 0, 
-            start: 0,
-            end: 0
-        }]);
-    } else {
-        // Handle new format with speaker info
-        updateTranscription([{
-            text: transcriptData.text,
-            speaker: transcriptData.speaker,
-            start: transcriptData.start,
-            end: transcriptData.end
-        }]);
-    }
-}
+    console.log('Received transcription:', message.data);
+    
+    // Extract the speaker ID with a default of 0
+    const speakerId = message.data.speaker || 0;
+    
+    // Create segment object
+    const segment = {
+      text: message.data.text,
+      speaker: speakerId,
+      start: message.data.start || 0,
+      end: message.data.end || 0
+    };
+    
+    // Update the display with the new segment
+    updateTranscription([segment]);
+  }
 
 // Handle analysis messages from Ably
 function handleAnalysisMessage(message) {

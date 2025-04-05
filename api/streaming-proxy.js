@@ -92,15 +92,27 @@ deepgramLive.addListener("transcriptReceived", (transcription) => {
     const transcript = data.channel.alternatives[0].transcript;
     if (!transcript || transcript.trim() === '') return;
     
-    // SIMPLIFIED: Just publish the transcript text directly like before
-    // This should work similar to your non-diarization version
+    // Extract speaker information if available
+    let speakerId = 0;
+    const words = data.channel.alternatives[0].words || [];
+    
+    if (words.length > 0 && 'speaker' in words[0]) {
+      speakerId = words[0].speaker;
+      
+      // Log speaker info for debugging
+      console.log(`Speaker ID detected: ${speakerId} for text: "${transcript.substring(0, 30)}..."`);
+    }
+    
+    // Publish with speaker information 
     broadcastChannel.publish('transcription', {
       sessionId: sessionId,
-      text: transcript
-      // No speaker info for now, just to test if basic transcription works
+      text: transcript,
+      speaker: speakerId,
+      start: data.start || 0,
+      end: data.end || 0
     });
     
-    console.log(`Published transcript: "${transcript}"`);
+    console.log(`Published transcript with speaker ${speakerId}: "${transcript}"`);
     
     if (transcript.length > 10) {
       processWithGroq(transcript, sessionId);
