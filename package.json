@@ -8,6 +8,7 @@
   "dependencies": {
     "ably": "^1.2.45",
     "node-fetch": "^2.6.12",
-    "@deepgram/sdk": "^2.4.0"
+    "@deepgram/sdk": "^2.4.0",
+    "@vercel/edge": "^1.1.0"
   }
 }
