@@ -1,10 +1,8 @@
 // Serverless function for Vercel using Ably for real-time streaming
 const Ably = require('ably');
 const fetch = require('node-fetch');
-const { Deepgram } = require('@deepgram/sdk');
 
 let ablyClient = null;
-let deepgramConnections = {};
 
 module.exports = async (req, res) => {
   // Set CORS headers
@@ -56,159 +54,77 @@ module.exports = async (req, res) => {
   // POST request - handling audio chunks
   else if (req.method === "POST") {
     try {
-      const { sessionId, audioData, isFirstChunk } = req.body;
+      const { sessionId, audioData } = req.body;
       
       if (!sessionId) {
         return res.status(400).json({ error: 'Missing session ID' });
       }
       
-      // If this is the first chunk, initialize a Deepgram connection
-      if (isFirstChunk || !deepgramConnections[sessionId]) {
-        await initializeDeepgramConnection(sessionId);
-      }
-      
       // Process the audio data
       if (audioData) {
-        const connection = deepgramConnections[sessionId];
-        if (connection && connection.deepgramLive) {
-          // Convert base64 to binary
-          const audioBuffer = Buffer.from(audioData, 'base64');
+        // Extract the actual base64 data (remove the prefix)
+        const base64String = audioData.split(',')[1] || audioData;
+        
+        try {
+          // Convert base64 to buffer
+          const audioBuffer = Buffer.from(base64String, 'base64');
           
-          // Send to Deepgram
-          connection.deepgramLive.send(audioBuffer);
-        } else {
-          console.error('Deepgram connection not available for session:', sessionId);
+          // Send to Deepgram using their REST API
+          const deepgramResponse = await fetch("https://api.deepgram.com/v1/listen?model=nova-2-phonecall&diarize=true&punctuate=true", {
+            method: "POST",
+            headers: {
+              "Authorization": `Token ${process.env.DEEPGRAM_API_KEY}`,
+              "Content-Type": "audio/webm"
+            },
+            body: audioBuffer
+          });
+          
+          if (!deepgramResponse.ok) {
+            throw new Error(`Deepgram API error: ${deepgramResponse.statusText}`);
+          }
+          
+          const transcriptionData = await deepgramResponse.json();
+          
+          // Process transcription
+          const transcript = transcriptionData.results?.channels[0]?.alternatives[0]?.transcript || "";
+          
+          // Get words with speaker information
+          const words = transcriptionData.results?.channels[0]?.alternatives[0]?.words || [];
+          
+          // Group words by speaker
+          let formattedSegments = processWordsBySegment(words);
+          
+          // Publish to Ably channel
+          if (transcript && transcript.trim() !== '') {
+            const transcriptChannel = ablyClient.channels.get('transcript-channel');
+            await transcriptChannel.publish('transcription', {
+              sessionId,
+              transcript,
+              segments: formattedSegments
+            });
+            
+            // Process with Groq if there's enough text
+            if (transcript.length > 10) {
+              await processWithGroq(transcript, sessionId, formattedSegments);
+            }
+          }
+          
+          return res.status(200).json({ success: true });
+        } catch (error) {
+          console.error('Error processing audio chunk:', error);
+          return res.status(500).json({ error: error.message });
         }
       }
       
-      return res.status(200).json({ success: true });
+      return res.status(400).json({ error: 'Missing audio data' });
     } catch (error) {
-      console.error('Error processing audio chunk:', error);
+      console.error('Error in POST handler:', error);
       return res.status(500).json({ error: error.message });
     }
   } else {
     return res.status(405).json({ error: "Method not allowed" });
   }
 };
-
-// Initialize a new Deepgram connection for a session
-async function initializeDeepgramConnection(sessionId) {
-  try {
-    // Create a new deepgram instance
-    const deepgram = new Deepgram(process.env.DEEPGRAM_API_KEY);
-    
-    // Create a deepgram live transcription instance
-    const deepgramLive = deepgram.transcription.live({
-      punctuate: true,
-      diarize: true,
-      model: 'nova-2-phonecall',
-      language: 'en-US',
-      encoding: 'linear16', // Added for better compatibility
-      sample_rate: 16000,    // Common sample rate
-      channels: 1,          // Mono audio
-      alternatives: 1,
-      utterance_end_ms: 1000, // End utterances after 1s of silence
-      interim_results: true,
-      smart_format: true,
-      max_speakers: 2,
-      min_speakers: 2
-    });
-    
-    // Get broadcast channel from Ably
-    const broadcastChannel = ablyClient.channels.get('transcript-channel');
-    
-    // Set up event handlers for the Deepgram connection
-    deepgramLive.addListener('open', () => {
-      console.log(`Deepgram connection established for session ${sessionId}`);
-    });
-    
-    deepgramLive.addListener('transcriptReceived', (transcription) => {
-      try {
-        const data = JSON.parse(transcription);
-        
-        if (!data.channel || !data.channel.alternatives || !data.channel.alternatives[0]) {
-          return;
-        }
-        
-        const transcript = data.channel.alternatives[0].transcript;
-        
-        if (transcript && transcript.trim() !== '') {
-          // Get words with speaker information
-          const words = data.channel.alternatives[0].words || [];
-          
-          // Group words by speaker
-          let formattedSegments = [];
-          let currentSegment = null;
-          
-          // Process each word to group by speaker
-          for (const word of words) {
-            if (!currentSegment || currentSegment.speaker !== word.speaker) {
-              if (currentSegment) {
-                formattedSegments.push(currentSegment);
-              }
-              currentSegment = {
-                text: word.word || word.punctuated_word,
-                start: word.start,
-                end: word.end,
-                speaker: word.speaker || 0
-              };
-            } else {
-              // Same speaker, add to current segment
-              currentSegment.text += " " + (word.word || word.punctuated_word);
-              currentSegment.end = word.end;
-            }
-          }
-          
-          // Add the last segment
-          if (currentSegment) {
-            formattedSegments.push(currentSegment);
-          }
-          
-          // Publish to Ably channel
-          broadcastChannel.publish('transcription', {
-            sessionId,
-            transcript,
-            segments: formattedSegments,
-            isFinal: data.is_final
-          });
-          
-          // If this is final, process with Groq for insights
-          if (data.is_final && transcript.length > 10) {
-            processWithGroq(transcript, sessionId, formattedSegments);
-          }
-        }
-      } catch (error) {
-        console.error('Error processing transcription:', error);
-      }
-    });
-    
-    deepgramLive.addListener('close', () => {
-      console.log(`Deepgram connection closed for session ${sessionId}`);
-      // Clean up the connection
-      delete deepgramConnections[sessionId];
-    });
-    
-    deepgramLive.addListener('error', (error) => {
-      console.error(`Deepgram error for session ${sessionId}:`, error);
-    });
-    
-    // Store the connection
-    deepgramConnections[sessionId] = {
-      deepgramLive,
-      lastActivity: Date.now()
-    };
-    
-    // Set up a cleanup timer to remove stale connections
-    setTimeout(() => {
-      cleanupOldConnections();
-    }, 60000); // Check every minute
-    
-    return deepgramLive;
-  } catch (error) {
-    console.error('Error initializing Deepgram connection:', error);
-    throw error;
-  }
-}
 
 // Process transcript with Groq for analysis
 async function processWithGroq(transcript, sessionId, segments) {
@@ -262,19 +178,33 @@ async function processWithGroq(transcript, sessionId, segments) {
   }
 }
 
-// Clean up old Deepgram connections
-function cleanupOldConnections() {
-  const now = Date.now();
-  const timeout = 5 * 60 * 1000; // 5 minutes
+// Helper function to process words into speaker segments
+function processWordsBySegment(words) {
+  const formattedSegments = [];
+  let currentSegment = null;
   
-  Object.keys(deepgramConnections).forEach(sessionId => {
-    const connection = deepgramConnections[sessionId];
-    if (now - connection.lastActivity > timeout) {
-      console.log(`Cleaning up stale connection for session ${sessionId}`);
-      if (connection.deepgramLive) {
-        connection.deepgramLive.close();
+  for (const word of words) {
+    if (!currentSegment || currentSegment.speaker !== word.speaker) {
+      if (currentSegment) {
+        formattedSegments.push(currentSegment);
       }
-      delete deepgramConnections[sessionId];
+      currentSegment = {
+        text: word.word || word.punctuated_word,
+        start: word.start,
+        end: word.end,
+        speaker: word.speaker || 0
+      };
+    } else {
+      // Same speaker, add to current segment
+      currentSegment.text += " " + (word.word || word.punctuated_word);
+      currentSegment.end = word.end;
     }
-  });
+  }
+  
+  // Add the last segment
+  if (currentSegment) {
+    formattedSegments.push(currentSegment);
+  }
+  
+  return formattedSegments;
 }
