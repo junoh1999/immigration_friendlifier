@@ -145,7 +145,7 @@ async function processWithGroq(transcriptionData, socket) {
         messages: [
           {
             role: 'system',
-            content: 'You are an AI assistant that translates the text transcript of a rude immigration officer to polite, welcoming text in real-time. Apologize for the officer and make excuses like "They have been working for a 8 hour shift, please know he does not mean it." if they seem to be way too rude. Keep your analysis concise and focused on the most recent statements.'
+            content: 'You are an AI assistant that summarizes and analyses spoken text in real-time. Extract key points, identify topics, and provide insights from conversations between multiple speakers. Keep your analysis concise and focused on the most recent statements.'
           },
           {
             role: 'user',
