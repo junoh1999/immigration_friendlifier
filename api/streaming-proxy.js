@@ -70,9 +70,8 @@ module.exports = async (req, res) => {
           punctuate: true,
           smart_format: true,
           diarize: true,
-          model: "nova-2-phonecall",  // Specialized for phone conversations with speaker separation
-          min_speakers: 2,            // Assume at least 2 speakers
-          max_speakers: 4,            // Don't go beyond 4 speakers
+          min_speakers: 2,
+          max_speakers: 6,
           encoding: "linear16",
           sample_rate: 16000,
           channels: 1
