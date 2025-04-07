@@ -10,7 +10,7 @@ export default WebSocketHandler(async (req, socket) => {
   // You could check for authorization headers here
   
   // Set up connection to Deepgram's streaming API
-  const deepgramSocket = new WebSocket('wss://api.deepgram.com/v1/listen?model=nova-2-phonecall&diarize=true&punctuate=true&min_speakers=2&max_speakers=2&encoding=linear16&sample_rate=16000', {
+  const deepgramSocket = new WebSocket('wss://api.deepgram.com/v1/listen?model=nova-2-phonecall&diarize=true&punctuate=true&min_speakers=2&max_speakers=4&encoding=linear16&sample_rate=16000', {
     headers: {
       Authorization: `Token ${process.env.DEEPGRAM_API_KEY}`
     }
@@ -106,6 +106,9 @@ async function processWithGroq(transcriptionData, socket) {
     let currentSegment = { text: '', start: 0, end: 0, speaker: -1 };
     
     words.forEach(word => {
+      // Only proceed if the word has speaker information
+      if (!('speaker' in word)) return;
+      
       if (currentSegment.speaker === -1 || currentSegment.speaker !== word.speaker) {
         if (currentSegment.speaker !== -1) {
           formattedSegments.push(currentSegment);

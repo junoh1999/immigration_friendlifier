@@ -85,38 +85,120 @@ module.exports = async (req, res) => {
         // Set up listeners
 // In your streaming-proxy.js, update the transcriptReceived handler
 
+// Update the transcriptReceived handler in streaming-proxy.js
+
 deepgramLive.addListener("transcriptReceived", (transcription) => {
   try {
     const data = JSON.parse(transcription);
-    if (data.channel == null) return;
     
-    const transcript = data.channel.alternatives[0].transcript;
-    if (!transcript || transcript.trim() === '') return;
+    // Log the entire transcription data for debugging
+    console.log('Deepgram transcription data:', JSON.stringify(data).substring(0, 500) + '...');
     
-    // Extract speaker information if available
-    let speakerId = 0;
-    const words = data.channel.alternatives[0].words || [];
-    
-    if (words.length > 0 && 'speaker' in words[0]) {
-      speakerId = words[0].speaker;
-      
-      // Log speaker info for debugging
-      console.log(`Speaker ID detected: ${speakerId} for text: "${transcript.substring(0, 30)}..."`);
+    if (!data.channel || !data.channel.alternatives || !data.channel.alternatives[0]) {
+      console.log('No valid channel data in transcription');
+      return;
     }
     
-    // Publish with speaker information 
-    broadcastChannel.publish('transcription', {
-      sessionId: sessionId,
-      text: transcript,
-      speaker: speakerId,
-      start: data.start || 0,
-      end: data.end || 0
+    const transcript = data.channel.alternatives[0].transcript;
+    if (!transcript || transcript.trim() === '') {
+      console.log('Empty transcript, skipping');
+      return;
+    }
+    
+    // Check if words with speaker information are available
+    const words = data.channel.alternatives[0].words || [];
+    
+    if (words.length === 0) {
+      console.log('No words data available for transcript:', transcript);
+      
+      // If no word-level data, just publish the transcript with default speaker
+      broadcastChannel.publish('transcription', {
+        sessionId: sessionId,
+        text: transcript,
+        speaker: 0,  // Default speaker
+        start: data.start || 0,
+        end: data.end || 0
+      });
+      
+      return;
+    }
+    
+    // Check if speaker information is available
+    if (!('speaker' in words[0])) {
+      console.log('Speaker information not available in words', words[0]);
+      
+      // Publish without speaker info
+      broadcastChannel.publish('transcription', {
+        sessionId: sessionId,
+        text: transcript,
+        speaker: 0,  // Default speaker
+        start: data.start || 0,
+        end: data.end || 0
+      });
+      
+      return;
+    }
+    
+    // Group words by speaker for better diarization
+    let currentSpeaker = words[0].speaker;
+    let currentSegment = {
+      text: words[0].word,
+      speaker: currentSpeaker,
+      start: words[0].start,
+      end: words[0].end
+    };
+    
+    const segments = [];
+    
+    // Group consecutive words by the same speaker
+    for (let i = 1; i < words.length; i++) {
+      const word = words[i];
+      
+      if (word.speaker === currentSpeaker) {
+        // Same speaker, add to current segment
+        currentSegment.text += ' ' + word.word;
+        currentSegment.end = word.end;
+      } else {
+        // New speaker, save current segment and start a new one
+        segments.push({...currentSegment});
+        
+        currentSpeaker = word.speaker;
+        currentSegment = {
+          text: word.word,
+          speaker: currentSpeaker,
+          start: word.start,
+          end: word.end
+        };
+      }
+    }
+    
+    // Add the final segment
+    segments.push({...currentSegment});
+    
+    // Log segments for debugging
+    console.log(`Created ${segments.length} segments from ${words.length} words`);
+    
+    // Publish each segment separately
+    segments.forEach(segment => {
+      console.log(`Publishing segment for speaker ${segment.speaker}: "${segment.text}"`);
+      
+      broadcastChannel.publish('transcription', {
+        sessionId: sessionId,
+        text: segment.text,
+        speaker: segment.speaker,
+        start: segment.start,
+        end: segment.end
+      });
     });
     
-    console.log(`Published transcript with speaker ${speakerId}: "${transcript}"`);
-    
+    // Process complete transcript with Groq if it's long enough
     if (transcript.length > 10) {
-      processWithGroq(transcript, sessionId);
+      // Create a formatted transcript with speaker information for Groq
+      const formattedTranscript = segments
+        .map(segment => `Speaker ${segment.speaker}: ${segment.text}`)
+        .join('\n');
+        
+      processWithGroq(formattedTranscript, sessionId);
     }
   } catch (error) {
     console.error('Error processing transcript:', error);
