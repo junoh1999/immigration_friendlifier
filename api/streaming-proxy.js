@@ -88,6 +88,7 @@ module.exports = async (req, res) => {
 deepgramLive.addListener("transcriptReceived", (transcription) => {
   try {
     const data = JSON.parse(transcription);
+    console.log("FULL DEEPGRAM RESPONSE:", JSON.stringify(data, null, 2));
     if (data.channel == null) return;
     
     const transcript = data.channel.alternatives[0].transcript;
