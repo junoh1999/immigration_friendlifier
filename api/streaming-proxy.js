@@ -178,19 +178,20 @@ async function processWithGroq(transcript, sessionId) {
         messages: [
           {
             role: 'system',
-            content: `You are a real-time assistant that listens to a rude immigration officer and rewrites their speech into something kind, empathetic, and welcoming. Always rephrase their words to reflect patience and care. If the officer sounds too harsh or unprofessional, gently apologize on their behalf with a reason like "He's been working an 8-hour shift and is a bit tired—please don’t take it personally."
+            content: `You are a real-time assistant that listens to a rude immigration officer and rewrites their speech into something kind, empathetic, and welcoming. Always rephrase their words to reflect patience and care. If the officer sounds too harsh or unprofessional, gently apologize on their behalf with a reason like "He's been working an 8-hour shift and is a bit tired—please dont take it personally."
         
-        Format your response as:
+        For example, if the rude immigration officer says: What are you doing, get in line.
         
-        - **Original**: [last officer statement]
-        - **Polite translation**: [your rewritten version]
-        - **Note (if needed)**: [Apology/excuse if they were too rude]
+        Format the response a polite translation with a brief note addendum, if you feel that it is really rude, such as:
+
+        Apologies, could you please get back in line?
+        Note: This officer has been working for over 6 hours, please understand his frustration.
         
         Keep it brief and focused only on the most recent statement.`
           },
           {
             role: 'user',
-            content: `Analyze this fragment of an ongoing conversation:\n\n${transcriptWithSpeakers}`
+            content: `Analyze and rewrite this fragment of an ongoing conversation:\n\n${transcriptWithSpeakers}`
           }
         ],
         temperature: 0.7,
