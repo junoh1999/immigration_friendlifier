@@ -9,6 +9,11 @@
 <body>
     <h1>Real-time Voice Processing</h1>
     
+    <!-- New emoji display section -->
+    <div class="container emoji-container">
+        <div id="emoji-display">😊</div>
+    </div>
+    
     <div class="container">
         <div class="controls">
             <button id="recordBtn" class="record-btn">Start Recording</button>
@@ -18,14 +23,27 @@
         </div>
     </div>
     
+    <!-- Modified transcription section with toggle -->
     <div class="container">
-        <h2>Transcription</h2>
-        <div id="transcription">No transcription yet</div>
+        <div class="section-header">
+            <h2>Transcription</h2>
+            <button id="toggleTranscription" class="toggle-btn">Hide</button>
+        </div>
+        <div id="transcription-container">
+            <div id="transcription">No transcription yet</div>
+        </div>
     </div>
     
+    <!-- Modified AI Analysis section with toggle and console -->
     <div class="container">
-        <h2>AI Analysis</h2>
-        <div id="analysis" class="analysis-content">No analysis yet</div>
+        <div class="section-header">
+            <h2>AI Analysis</h2>
+            <button id="toggleAnalysis" class="toggle-btn">Hide</button>
+        </div>
+        <div id="analysis-container">
+            <div id="analysis-console" class="console-content">No analysis metadata yet</div>
+            <div id="analysis" class="analysis-content">No analysis output yet</div>
+        </div>
     </div>
     
     <script src="streaming-script.js"></script>

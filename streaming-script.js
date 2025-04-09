@@ -5,6 +5,27 @@ const timerEl = document.getElementById('timer');
 const statusEl = document.getElementById('status');
 const transcriptionEl = document.getElementById('transcription');
 const analysisEl = document.getElementById('analysis');
+const analysisConsoleEl = document.getElementById('analysis-console');
+const emojiDisplayEl = document.getElementById('emoji-display');
+
+console.log('DOM elements found:', {
+  recordBtn: !!recordBtn, 
+  stopBtn: !!stopBtn,
+  timerEl: !!timerEl,
+  statusEl: !!statusEl,
+  transcriptionEl: !!transcriptionEl,
+  analysisEl: !!analysisEl,
+  analysisConsoleEl: !!analysisConsoleEl,
+  emojiDisplayEl: !!emojiDisplayEl
+});
+
+// Toggle buttons
+const toggleTranscriptionBtn = document.getElementById('toggleTranscription');
+const toggleAnalysisBtn = document.getElementById('toggleAnalysis');
+
+// Toggle containers
+const transcriptionContainer = document.getElementById('transcription-container');
+const analysisContainer = document.getElementById('analysis-container');
 
 // Global variables
 let mediaRecorder;
@@ -25,6 +46,9 @@ if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     recordBtn.disabled = true;
 }
 
+// Initialize toggle buttons
+initializeToggleButtons();
+
 // Initialize Ably
 initializeAbly();
 
@@ -38,6 +62,25 @@ stopBtn.addEventListener('click', function() {
     console.log('Stop button clicked');
     stopRecording();
 });
+
+// Initialize toggle buttons functionality
+function initializeToggleButtons() {
+    // Transcription toggle
+    toggleTranscriptionBtn.addEventListener('click', function() {
+        const isHidden = transcriptionContainer.classList.toggle('hidden');
+        toggleTranscriptionBtn.textContent = isHidden ? 'Show' : 'Hide';
+        toggleTranscriptionBtn.classList.toggle('show', isHidden);
+        toggleTranscriptionBtn.classList.toggle('hide', !isHidden);
+    });
+    
+    // Analysis toggle
+    toggleAnalysisBtn.addEventListener('click', function() {
+        const isHidden = analysisContainer.classList.toggle('hidden');
+        toggleAnalysisBtn.textContent = isHidden ? 'Show' : 'Hide';
+        toggleAnalysisBtn.classList.toggle('show', isHidden);
+        toggleAnalysisBtn.classList.toggle('hide', !isHidden);
+    });
+}
 
 // Functions
 async function initializeAbly() {
@@ -99,9 +142,11 @@ async function startRecording() {
         });
         console.log('Got audio stream:', stream);
         
-        // Clear previous transcriptions
+        // Clear previous transcriptions and analysis
         transcriptionEl.innerHTML = '';
-        if (analysisEl) analysisEl.innerHTML = '';
+        analysisEl.innerHTML = '';
+        analysisConsoleEl.innerHTML = '';
+        emojiDisplayEl.textContent = ''; // Clear emoji
         
         // Generate a new session ID for this recording
         sessionId = generateUniqueId();
@@ -329,7 +374,7 @@ function handleTranscriptionMessage(message) {
     
     // Update the display with the new segment
     updateTranscription([segment]);
-  }
+}
 
 // Handle analysis messages from Ably
 function handleAnalysisMessage(message) {
@@ -420,28 +465,83 @@ function displayTranscription(segments) {
 // Display LLM analysis
 function displayAnalysis(analysisText) {
     if (!analysisEl) {
-        console.log('Analysis element not found, creating one');
-        // Create the element if it doesn't exist
-        const containerDiv = document.querySelector('.container:nth-child(2)');
-        const analysisContainer = document.createElement('div');
-        analysisContainer.className = 'container';
-        analysisContainer.innerHTML = `
-            <h2>AI Analysis</h2>
-            <div id="analysis" class="analysis-content"></div>
-        `;
-        document.body.insertBefore(analysisContainer, containerDiv.nextSibling);
-        analysisEl = document.getElementById('analysis');
+        console.log('Analysis element not found');
+        return;
     }
     
     if (!analysisText) {
         analysisEl.textContent = 'No analysis available';
+        analysisConsoleEl.textContent = 'No analysis metadata available';
         return;
     }
     
+    // Extract the emoji and analysis from the text
+    let emoji = '';
+    let consoleText = '';
+    let displayText = analysisText;
+    
+    // Split at "Output:" if it exists
+    const outputParts = analysisText.split(/Output:/i);
+    
+    if (outputParts.length > 1) {
+        // The first part is the analysis metadata (for console)
+        consoleText = outputParts[0].trim();
+        displayText = outputParts[1].trim();
+    }
+    
+    // Extract emoji from the display text
+    // Look for emoji pattern - typically in brackets or at the beginning of text
+    const emojiRegex = /\[([^[\]]*emoji[^[\]]*)\]|\p{Emoji}/u;
+    const emojiMatch = displayText.match(emojiRegex);
+    
+    if (emojiMatch) {
+        // If it's a described emoji in brackets, replace with a standard one
+        if (emojiMatch[0].includes('[')) {
+            // Map common emoji descriptions to actual emojis
+            const emojiMap = {
+                'crying': '😢',
+                'apologetic': '😔',
+                'apologetic crying': '😔',
+                'deep breath': '😌',
+                'calm': '😌',
+                'smile': '😊',
+                'angry': '😠',
+                'confused': '😕',
+                'thinking': '🤔'
+            };
+            
+            // Try to find an appropriate emoji based on the description
+            for (const [desc, actualEmoji] of Object.entries(emojiMap)) {
+                if (emojiMatch[0].toLowerCase().includes(desc)) {
+                    emoji = actualEmoji;
+                    break;
+                }
+            }
+            
+            // Default emoji if no match found
+            if (!emoji) emoji = '😊';
+            
+            // Remove the bracket description from the display text
+            displayText = displayText.replace(emojiMatch[0], '').trim();
+        } else {
+            // It's an actual emoji character
+            emoji = emojiMatch[0];
+            // Remove it from the display text
+            displayText = displayText.replace(emojiMatch[0], '').trim();
+        }
+    }
+    
+    // Update emoji display
+    emojiDisplayEl.textContent = emoji || '😊'; // Default emoji if none found
+    
+    // Update console display
+    analysisConsoleEl.textContent = consoleText || 'No analysis metadata available';
+    
+    // Update analysis content
     analysisEl.innerHTML = '';
     
-    // Format the analysis text with Markdown-like handling
-    const paragraphs = analysisText.split('\n\n');
+    // Format the display text with Markdown-like handling
+    const paragraphs = displayText.split('\n\n');
     paragraphs.forEach(paragraph => {
         if (paragraph.trim().startsWith('#')) {
             // Handle heading
@@ -523,5 +623,3 @@ function arrayBufferToBase64(buffer) {
     }
     return window.btoa(binary);
 }
-
-console.log('Script loaded and initialized with Ably streaming support');

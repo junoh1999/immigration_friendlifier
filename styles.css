@@ -55,6 +55,42 @@ button:hover:not(:disabled) {
     animation: pulse 1.5s infinite;
 }
 
+/* New toggle button styles */
+.toggle-btn {
+    background-color: #666;
+    font-size: 14px;
+    padding: 6px 12px;
+}
+
+.toggle-btn:hover {
+    background-color: #555;
+}
+
+.toggle-btn.show {
+    background-color: #28a745;
+}
+
+.toggle-btn.hide {
+    background-color: #666;
+}
+
+/* Section header with toggle */
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.section-header h2 {
+    margin: 0;
+}
+
+/* Hidden state for containers */
+.hidden {
+    display: none;
+}
+
 @keyframes pulse {
     0% { background-color: #ff3b30; }
     50% { background-color: #ff6b62; }
@@ -110,7 +146,21 @@ button:hover:not(:disabled) {
     margin-bottom: 4px;
 }
 
-/* New styles for analysis section */
+/* Console section for analysis metadata */
+.console-content {
+    padding: 15px;
+    margin-top: 20px;
+    margin-bottom: 20px;
+    border-radius: 8px;
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    font-family: monospace;
+    white-space: pre-wrap;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/* Analysis content styling */
 .analysis-content {
     padding: 15px;
     margin-top: 20px;
@@ -139,6 +189,18 @@ button:hover:not(:disabled) {
 
 .analysis-content li {
     margin-bottom: 4px;
+}
+
+/* Emoji display */
+.emoji-container {
+    text-align: center;
+    padding: 10px;
+}
+
+#emoji-display {
+    font-size: 72px;
+    line-height: 1;
+    margin: 10px 0;
 }
 
 /* Mode toggle */
