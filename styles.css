@@ -133,6 +133,28 @@ title{
     margin: 40px 0;
 }
 
+/* Toggle Fold Button */
+.toggle-fold-btn {
+    margin-top: 30px;
+    padding: 10px 20px;
+    background-color: #2A65AF;
+    color: white;
+    border: none;
+    border-radius: 20px;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.toggle-fold-btn:hover {
+    background-color: #1D4F8C;
+}
+
+.toggle-fold-btn:active {
+    transform: translateY(1px);
+}
+
 /* Loading state */
 .loading-indicator {
     width: 24px;
@@ -160,6 +182,7 @@ title{
 /* Below fold content */
 .below-fold {
     padding-top: 20px;
+    transition: max-height 0.5s ease-out, opacity 0.5s ease-out;
 }
 
 /* Timer section */

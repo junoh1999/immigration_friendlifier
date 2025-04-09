@@ -8,6 +8,8 @@ const analysisEl = document.getElementById('analysis');
 const analysisConsoleEl = document.getElementById('analysis-console');
 const emojiDisplayEl = document.getElementById('emoji-display');
 const welcomeMessageEl = document.getElementById('welcome-message');
+const toggleFoldBtn = document.getElementById('toggleFoldBtn');
+const belowFoldEl = document.querySelector('.below-fold');
 
 console.log('DOM elements found:', {
   recordBtn: !!recordBtn, 
@@ -18,12 +20,10 @@ console.log('DOM elements found:', {
   analysisEl: !!analysisEl,
   analysisConsoleEl: !!analysisConsoleEl,
   emojiDisplayEl: !!emojiDisplayEl,
-  welcomeMessageEl: !!welcomeMessageEl
+  welcomeMessageEl: !!welcomeMessageEl,
+  toggleFoldBtn: !!toggleFoldBtn,
+  belowFoldEl: !!belowFoldEl
 });
-
-// Toggle buttons were removed from HTML, so we'll skip initializing them
-// const toggleTranscriptionBtn = document.getElementById('toggleTranscription');
-// const toggleAnalysisBtn = document.getElementById('toggleAnalysis');
 
 // Toggle containers
 const transcriptionContainer = document.getElementById('transcription-container');
@@ -40,6 +40,7 @@ let sessionId = generateUniqueId();
 let ablyClient = null;
 let transcriptChannel = null;
 let analysisChannel = null;
+let isFoldVisible = false;
 
 // Check for browser support
 if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -62,7 +63,24 @@ stopBtn.addEventListener('click', function() {
     stopRecording();
 });
 
+// Add toggle fold button event listener
+toggleFoldBtn.addEventListener('click', function() {
+    toggleFold();
+});
+
 // Functions
+function toggleFold() {
+    isFoldVisible = !isFoldVisible;
+    
+    if (isFoldVisible) {
+        belowFoldEl.classList.remove('hidden');
+        toggleFoldBtn.textContent = 'Hide Details';
+    } else {
+        belowFoldEl.classList.add('hidden');
+        toggleFoldBtn.textContent = 'Show Details';
+    }
+}
+
 async function initializeAbly() {
     try {
         // Load Ably script dynamically
@@ -156,6 +174,11 @@ async function startRecording() {
             'Recording (streaming mode)...' : 'Recording (batch mode)...';
         recordBtn.classList.add('recording');
         isRecording = true;
+        
+        // Show the below-fold section when recording starts
+        if (!isFoldVisible) {
+            toggleFold();
+        }
         
     } catch (error) {
         console.error('Error starting recording:', error);
