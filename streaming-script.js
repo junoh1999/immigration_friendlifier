@@ -7,6 +7,7 @@ const transcriptionEl = document.getElementById('transcription');
 const analysisEl = document.getElementById('analysis');
 const analysisConsoleEl = document.getElementById('analysis-console');
 const emojiDisplayEl = document.getElementById('emoji-display');
+const welcomeMessageEl = document.getElementById('welcome-message');
 
 console.log('DOM elements found:', {
   recordBtn: !!recordBtn, 
@@ -16,12 +17,13 @@ console.log('DOM elements found:', {
   transcriptionEl: !!transcriptionEl,
   analysisEl: !!analysisEl,
   analysisConsoleEl: !!analysisConsoleEl,
-  emojiDisplayEl: !!emojiDisplayEl
+  emojiDisplayEl: !!emojiDisplayEl,
+  welcomeMessageEl: !!welcomeMessageEl
 });
 
-// Toggle buttons
-const toggleTranscriptionBtn = document.getElementById('toggleTranscription');
-const toggleAnalysisBtn = document.getElementById('toggleAnalysis');
+// Toggle buttons were removed from HTML, so we'll skip initializing them
+// const toggleTranscriptionBtn = document.getElementById('toggleTranscription');
+// const toggleAnalysisBtn = document.getElementById('toggleAnalysis');
 
 // Toggle containers
 const transcriptionContainer = document.getElementById('transcription-container');
@@ -46,9 +48,6 @@ if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     recordBtn.disabled = true;
 }
 
-// Initialize toggle buttons
-initializeToggleButtons();
-
 // Initialize Ably
 initializeAbly();
 
@@ -62,25 +61,6 @@ stopBtn.addEventListener('click', function() {
     console.log('Stop button clicked');
     stopRecording();
 });
-
-// Initialize toggle buttons functionality
-function initializeToggleButtons() {
-    // Transcription toggle
-    toggleTranscriptionBtn.addEventListener('click', function() {
-        const isHidden = transcriptionContainer.classList.toggle('hidden');
-        toggleTranscriptionBtn.textContent = isHidden ? 'Show' : 'Hide';
-        toggleTranscriptionBtn.classList.toggle('show', isHidden);
-        toggleTranscriptionBtn.classList.toggle('hide', !isHidden);
-    });
-    
-    // Analysis toggle
-    toggleAnalysisBtn.addEventListener('click', function() {
-        const isHidden = analysisContainer.classList.toggle('hidden');
-        toggleAnalysisBtn.textContent = isHidden ? 'Show' : 'Hide';
-        toggleAnalysisBtn.classList.toggle('show', isHidden);
-        toggleAnalysisBtn.classList.toggle('hide', !isHidden);
-    });
-}
 
 // Functions
 async function initializeAbly() {
@@ -146,7 +126,14 @@ async function startRecording() {
         transcriptionEl.innerHTML = '';
         analysisEl.innerHTML = '';
         analysisConsoleEl.innerHTML = '';
-        emojiDisplayEl.textContent = ''; // Clear emoji
+        
+        // Show loading indicator
+        showLoadingIndicator();
+        
+        // Hide welcome message when recording starts
+        if (welcomeMessageEl) {
+            welcomeMessageEl.classList.add('hidden');
+        }
         
         // Generate a new session ID for this recording
         sessionId = generateUniqueId();
@@ -382,6 +369,10 @@ function handleAnalysisMessage(message) {
     
     const analysis = message.data.analysis;
     if (analysis) {
+        // Hide welcome message
+        if (welcomeMessageEl) {
+            welcomeMessageEl.classList.add('hidden');
+        }
         displayAnalysis(analysis);
     }
 }
@@ -557,6 +548,13 @@ function displayAnalysis(analysisText) {
     });
 }
 
+// Show loading indicator
+function showLoadingIndicator() {
+    if (emojiDisplayEl) {
+        emojiDisplayEl.innerHTML = '<div class="loading-indicator"></div>';
+    }
+}
+
 // Helper functions
 function startTimer() {
     clearInterval(timerInterval);
@@ -612,8 +610,7 @@ function arrayBufferToBase64(buffer) {
     return window.btoa(binary);
 }
 
-
-// Add this function to update the clock in the navbar
+// Update the clock in the navbar
 function updateClock() {
     const now = new Date();
     const hours = now.getHours();
@@ -626,32 +623,6 @@ function updateClock() {
     const timeEl = document.querySelector('.time');
     if (timeEl) {
         timeEl.textContent = timeString;
-    }
-}
-
-// Handle welcome message visibility
-function hideWelcomeMessage() {
-    const welcomeMessageEl = document.getElementById('welcome-message');
-    if (welcomeMessageEl) {
-        welcomeMessageEl.classList.add('hidden');
-    }
-}
-
-// Modify handleAnalysisMessage to hide welcome message when analysis comes in
-function handleAnalysisMessage(message) {
-    if (message.data.sessionId !== sessionId) return;
-    
-    const analysis = message.data.analysis;
-    if (analysis) {
-        hideWelcomeMessage();
-        displayAnalysis(analysis);
-    }
-}
-
-// Add this to startRecording function (after other initializations)
-function showLoadingIndicator() {
-    if (emojiDisplayEl) {
-        emojiDisplayEl.innerHTML = '<div class="loading-indicator"></div>';
     }
 }
 
