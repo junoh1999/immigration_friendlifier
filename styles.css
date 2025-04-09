@@ -14,7 +14,7 @@ html, body {
 }
 
 title{
-    font-size: 4.5em;
+    font-size: 60px;
 }
 
 /* Navbar */
@@ -114,7 +114,7 @@ title{
 }
 
 #emoji-display {
-    font-size: 6em;
+    font-size: 125px;
     line-height: 1;
     margin: 20px 0;
     height: 80px;
@@ -145,7 +145,7 @@ title{
 /* Analysis content */
 .analysis-content {
     padding: 15px 0;
-    font-size: 4em;
+    font-size: 48px;
     line-height: 1.4;
     color: #122835;
 }
