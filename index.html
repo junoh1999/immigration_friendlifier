@@ -7,44 +7,53 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <h1>Real-time Voice Processing</h1>
+    <!-- Navbar -->
+    <header class="navbar">
+        <div class="time">9:41 PM</div>
+        <button id="recordBtn" class="record-btn-circle"><img src="/api/placeholder/24/24" alt="microphone"></button>
+    </header>
     
-    <!-- New emoji display section -->
-    <div class="container emoji-container">
-        <div id="emoji-display">😊</div>
-        <div id="analysis" class="analysis-content">No analysis output yet</div>
-    </div>
+    <!-- Main content -->
+    <main class="main-content">
+        <!-- Emoji display section -->
+        <div class="container emoji-container">
+            <div id="emoji-display">😊</div>
+            <h2 id="welcome-message">Welcome to the United States!</h2>
+            <div id="analysis" class="analysis-content">This app will explain what's being asked and help you respond with confidence.</div>
+        </div>
+        
+        <!-- Hidden content below the fold -->
+        <div class="below-fold">
+            <!-- Timer -->
+            <div class="container timer-container">
+                <div id="timer">00:00</div>
+                <div id="status">Ready to record</div>
+            </div>
+            
+            <!-- Transcription section -->
+            <div class="container">
+                <div class="section-header">
+                    <h2>Transcription</h2>
+                </div>
+                <div id="transcription-container">
+                    <div id="transcription">No transcription yet</div>
+                </div>
+            </div>
+            
+            <!-- AI Analysis section -->
+            <div class="container">
+                <div class="section-header">
+                    <h2>AI Analysis</h2>
+                </div>
+                <div id="analysis-container">
+                    <div id="analysis-console" class="console-content">No analysis metadata yet</div>
+                </div>
+            </div>
+        </div>
+    </main>
     
-    <div class="container">
-        <div class="controls">
-            <button id="recordBtn" class="record-btn">Start Recording</button>
-            <button id="stopBtn" disabled>Stop Recording</button>
-            <div id="timer">00:00</div>
-            <div id="status">Ready to record</div>
-        </div>
-    </div>
-    
-    <!-- Modified transcription section with toggle -->
-    <div class="container">
-        <div class="section-header">
-            <h2>Transcription</h2>
-            <button id="toggleTranscription" class="toggle-btn">Hide</button>
-        </div>
-        <div id="transcription-container">
-            <div id="transcription">No transcription yet</div>
-        </div>
-    </div>
-    
-    <!-- Modified AI Analysis section with toggle and console -->
-    <div class="container">
-        <div class="section-header">
-            <h2>AI Analysis</h2>
-            <button id="toggleAnalysis" class="toggle-btn">Hide</button>
-        </div>
-        <div id="analysis-container">
-            <div id="analysis-console" class="console-content">No analysis metadata yet</div>
-        </div>
-    </div>
+    <!-- Hidden stop button (will be shown/hidden via JS) -->
+    <button id="stopBtn" class="hidden">Stop Recording</button>
     
     <script src="streaming-script.js"></script>
 </body>
