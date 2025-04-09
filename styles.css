@@ -290,3 +290,16 @@ title{
 .blink-arrow {
     animation: blink-arrow 0.5s 3;  /* Blink 3 times */
 }
+
+/* Add these styles to your styles.css file */
+
+/* Message highlight animation */
+@keyframes highlight-message {
+    0% { opacity: 1; }
+    50% { opacity: 0.3; }
+    100% { opacity: 1; }
+}
+
+.highlight-new-message {
+    animation: highlight-message 0.7s 2;  /* Blink twice with a slower speed */
+}

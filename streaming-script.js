@@ -475,6 +475,8 @@ function displayTranscription(segments) {
 // Display LLM analysis
 // Update the displayAnalysis function in streaming-script.js
 
+// Update the displayAnalysis function in streaming-script.js
+
 function displayAnalysis(analysisText) {
     if (!analysisEl) {
         console.log('Analysis element not found');
@@ -565,23 +567,17 @@ function displayAnalysis(analysisText) {
     // Update analysis content with clean text
     analysisEl.innerHTML = '';
     
-    // Add the display text with attention arrow
+    // Add the display text with blinking animation
     if (displayText.trim()) {
         const pEl = document.createElement('p');
-        
-        // Create and insert the attention arrow at the beginning of the text
-        const arrowSpan = document.createElement('span');
-        arrowSpan.className = 'attention-arrow blink-arrow';
-        arrowSpan.textContent = '>';
-        
-        pEl.appendChild(arrowSpan);
-        pEl.appendChild(document.createTextNode(' ' + displayText.trim()));
+        pEl.className = 'highlight-new-message'; // Add highlight class for blinking
+        pEl.textContent = displayText.trim();
         analysisEl.appendChild(pEl);
         
-        // Remove the blinking class after animation completes (approx 1.5s)
+        // Remove the highlight class after animation completes
         setTimeout(() => {
-            arrowSpan.classList.remove('blink-arrow');
-        }, 1500);
+            pEl.classList.remove('highlight-new-message');
+        }, 1500); // Animation duration: 0.7s * 2 = 1.4s (added a small buffer)
     }
     
     console.log("Processed analysis:", {
