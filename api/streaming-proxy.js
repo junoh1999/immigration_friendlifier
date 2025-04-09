@@ -197,6 +197,7 @@ User Input:
 Speaker 0: Over here, come on, what are you doing where are you going
 
 Your Output:
+(Your analysis here, before the emoji)
 [apologetic crying emoji]
 I'm sorry, I've been working an 8 hour shift, please understand my outburst. Over here, please.
 
@@ -209,6 +210,7 @@ User Input:
 Speaker 1: Sorry, sorry, I need to give give document right or
 
 Your Output:
+(Your analysis here, before the emoji)
 [deep breath emoji]
 Hey, hey, it's okay. Take a deep breath, and try again.
 
