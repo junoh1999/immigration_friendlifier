@@ -178,47 +178,45 @@ async function processWithGroq(transcript, sessionId) {
         messages: [
           {
             role: 'system',
-            content: `You are an AI assistant that that receives speech-to-text-transcripts from an immigration officer to foreign student conversation exchange, and processes it in the following way:
+            content: `You are an AI assistant that receives speech-to-text transcripts from immigration officer/foreign student conversations and processes them.
 
-1. You identify the Speaker ID with their respective text-transcript.
-2. If the most recent input is Speaker 0 (the immigration officer), you analyze Speaker 0's current and past text transcripts, and look for signs or patterns of anger, passive-aggression, or general rudeness.
-3. If the most recent input is Speaker 1  (the international student), you analyze Speaker 1's current and past text transcripts, and look for signs of nervousness, stuttering, or general shyness.
-4. End deliverable will be:
-a. If Speaker 0 is being angry, passive-aggressive, or rude, a translation of their transcript into something polite and apologetic.
-b. If Speaker 1 is being nervous, stuttering, or being generally shy, an attempt to calm them down as a concerned but gentle mentor figure.
-c. An emoji that goes along with whatever message is shown.
+STRICT OUTPUT FORMAT:
+Your response must ALWAYS follow this EXACT format with these exact section headers:
 
-Make sure to keep whatever message is shown to the user to 2 sentences maximum.
+---ANALYSIS---
+[Your internal analysis of the conversation - this will NOT be shown to the user]
 
-Here's an example scenario #1 (please use real emojis in place of the placeholders):
+---EMOJI---
+[Single emoji that represents the emotional response needed]
 
-User Input:
+---MESSAGE---
+[One or two sentences maximum that will be shown to the user]
 
-Speaker 0: Over here, come on, what are you doing where are you going
+Rules for each section:
+1. The ANALYSIS section should identify the speaker and analyze their tone (anger/rudeness for Speaker 0, nervousness/shyness for Speaker 1).
+2. The EMOJI section must contain exactly one emoji character.
+3. The MESSAGE section must be brief (1-2 sentences) and should be:
+   - For Speaker 0: A polite, apologetic reformulation of their message if they sounded rude
+   - For Speaker 1: A calming, reassuring response if they sounded nervous
 
-Your Output:
-(Your analysis here, before the emoji)
-[apologetic crying emoji]
-I'm sorry, I've been working an 8 hour shift, please understand my outburst. Over here, please.
-
-Here's an example scenario #2 (please use real emojis in place of the placeholders):
-
-Conversation Context so far:
-Speaker 0: Over here, come on, what are you doing where are you going
-
-User Input:
-Speaker 1: Sorry, sorry, I need to give give document right or
-
-Your Output:
-(Your analysis here, before the emoji)
-[deep breath emoji]
-Hey, hey, it's okay. Take a deep breath, and try again.
-
-`
+DO NOT deviate from this format. DO NOT add additional sections. DO NOT use markdown formatting with asterisks.`
           },
           {
             role: 'user',
-            content: `Analyze this fragment of an ongoing conversation:\n\n${transcript}`
+            content: `Here is a sample of the correct output format I expect:
+
+---ANALYSIS---
+Speaker 1 is showing signs of nervousness with repeated words "give give" and apologizing multiple times.
+
+---EMOJI---
+😌
+
+---MESSAGE---
+Take a deep breath and try again. You're doing just fine.
+
+Now analyze this fragment of an ongoing conversation:
+
+${transcript}`
           }
         ],
         temperature: 0.7,
