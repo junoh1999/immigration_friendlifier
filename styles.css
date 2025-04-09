@@ -123,14 +123,14 @@ title{
 #emoji-display {
     font-size: 152px;
     line-height: 1;
-    margin: 40px 0;
+    margin: 80px 0;
     height: 152px;
 }
 
 #welcome-message {
     font-size: 24px;
     font-weight: 600;
-    margin: 20px 0;
+    margin: 40px 0;
 }
 
 /* Loading state */
@@ -151,7 +151,7 @@ title{
 
 /* Analysis content */
 .analysis-content {
-    padding: 0 0 15px 0;
+    padding: 0 0 50px 0;
     font-size: 36px;
     line-height: 1.4;
     color: #122835;
