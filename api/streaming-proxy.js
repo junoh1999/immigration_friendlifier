@@ -201,7 +201,7 @@ Your Output:
 [apologetic crying emoji]
 I'm sorry, I've been working an 8 hour shift, please understand my outburst. Over here, please.
 
-Here's an example scenario #2:
+Here's an example scenario #2 (please use real emojis in place of the placeholders):
 
 Conversation Context so far:
 Speaker 0: Over here, come on, what are you doing where are you going

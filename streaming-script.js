@@ -475,67 +475,85 @@ function displayAnalysis(analysisText) {
         return;
     }
     
-    // Extract the emoji and analysis from the text
-    let emoji = '';
+    console.log("Raw analysis text:", analysisText);
+    
+    // Extract the analysis metadata and output sections
     let consoleText = '';
     let displayText = analysisText;
+    let emoji = '';
     
-    // Split at "Output:" if it exists
-    const outputParts = analysisText.split(/Output:/i);
+    // First, identify if there's an Output: marker
+    const outputSplit = analysisText.split(/Output:/i);
     
-    if (outputParts.length > 1) {
-        // The first part is the analysis metadata (for console)
-        consoleText = outputParts[0].trim();
-        displayText = outputParts[1].trim();
+    if (outputSplit.length > 1) {
+        consoleText = outputSplit[0].trim();
+        displayText = outputSplit[1].trim();
+    } else {
+        // If no Output: marker, try to separate based on common patterns
+        // Look for patterns like "**" or analysis sections
+        const analysisSplit = analysisText.match(/\*\*Analysis:\*\*([\s\S]*?)(?:\*\*|$)/i);
+        
+        if (analysisSplit) {
+            consoleText = analysisText;
+            
+            // Try to find the actual message after all the analysis sections
+            const messageParts = analysisText.split(/\*\*$/m);
+            if (messageParts.length > 1) {
+                // Get the last non-empty part as the message
+                for (let i = messageParts.length - 1; i >= 0; i--) {
+                    if (messageParts[i].trim()) {
+                        displayText = messageParts[i].trim();
+                        break;
+                    }
+                }
+            }
+        }
     }
     
-    // Extract emoji from the display text - keep as is without mapping
-    // Look for emoji pattern
-    const emojiMatch = displayText.match(/\[[^\]]+\]|\p{Emoji_Presentation}|\p{Emoji}\uFE0F/u);
+    // Extract emoji - look for it at the beginning of the display text
+    // Check for emoji or bracketed emoji description at the start of a line
+    const emojiMatch = displayText.match(/^(\[[^\]]+\]|\p{Emoji_Presentation}|\p{Emoji}\uFE0F)/um);
     
     if (emojiMatch) {
-        // Just use the emoji or emoji description as-is
         emoji = emojiMatch[0];
-        
-        // Remove the emoji from the display text
         displayText = displayText.replace(emojiMatch[0], '').trim();
+    } else {
+        // If no emoji at the start, check throughout the text
+        const anyEmojiMatch = displayText.match(/(\[[^\]]+\]|\p{Emoji_Presentation}|\p{Emoji}\uFE0F)/u);
+        if (anyEmojiMatch) {
+            emoji = anyEmojiMatch[0];
+            displayText = displayText.replace(anyEmojiMatch[0], '').trim();
+        }
     }
+    
+    // Clean up the display text
+    // Remove any remaining asterisks, markdown formatting
+    displayText = displayText.replace(/\*\*/g, '').trim();
     
     // Update emoji display
     emojiDisplayEl.textContent = emoji || '😊'; // Default emoji if none found
     
-    // Update console display
+    // Update console display - keep the raw format including asterisks
     analysisConsoleEl.textContent = consoleText || 'No analysis metadata available';
     
-    // Update analysis content
+    // Update analysis content with clean text
     analysisEl.innerHTML = '';
     
-    // Format the display text with Markdown-like handling
+    // Format the clean display text
     const paragraphs = displayText.split('\n\n');
     paragraphs.forEach(paragraph => {
-        if (paragraph.trim().startsWith('#')) {
-            // Handle heading
-            const headingEl = document.createElement('h3');
-            headingEl.textContent = paragraph.trim().replace(/^#+\s/, '');
-            analysisEl.appendChild(headingEl);
-        } else if (paragraph.trim().startsWith('-') || paragraph.trim().startsWith('*')) {
-            // Handle list
-            const ulEl = document.createElement('ul');
-            const listItems = paragraph.trim().split('\n');
-            listItems.forEach(item => {
-                if (item.trim()) {
-                    const liEl = document.createElement('li');
-                    liEl.textContent = item.trim().replace(/^[-*]\s/, '');
-                    ulEl.appendChild(liEl);
-                }
-            });
-            analysisEl.appendChild(ulEl);
-        } else if (paragraph.trim()) {
+        if (paragraph.trim()) {
             // Regular paragraph
             const pEl = document.createElement('p');
             pEl.textContent = paragraph.trim();
             analysisEl.appendChild(pEl);
         }
+    });
+    
+    console.log("Processed analysis:", {
+        emoji: emoji,
+        consoleText: consoleText.substring(0, 100) + "...", // Log first 100 chars
+        displayText: displayText
     });
 }
 
