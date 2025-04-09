@@ -489,46 +489,16 @@ function displayAnalysis(analysisText) {
         displayText = outputParts[1].trim();
     }
     
-    // Extract emoji from the display text
-    // Look for emoji pattern - typically in brackets or at the beginning of text
-    const emojiRegex = /\[([^[\]]*emoji[^[\]]*)\]|\p{Emoji}/u;
-    const emojiMatch = displayText.match(emojiRegex);
+    // Extract emoji from the display text - keep as is without mapping
+    // Look for emoji pattern
+    const emojiMatch = displayText.match(/\[[^\]]+\]|\p{Emoji_Presentation}|\p{Emoji}\uFE0F/u);
     
     if (emojiMatch) {
-        // If it's a described emoji in brackets, replace with a standard one
-        if (emojiMatch[0].includes('[')) {
-            // Map common emoji descriptions to actual emojis
-            const emojiMap = {
-                'crying': '😢',
-                'apologetic': '😔',
-                'apologetic crying': '😔',
-                'deep breath': '😌',
-                'calm': '😌',
-                'smile': '😊',
-                'angry': '😠',
-                'confused': '😕',
-                'thinking': '🤔'
-            };
-            
-            // Try to find an appropriate emoji based on the description
-            for (const [desc, actualEmoji] of Object.entries(emojiMap)) {
-                if (emojiMatch[0].toLowerCase().includes(desc)) {
-                    emoji = actualEmoji;
-                    break;
-                }
-            }
-            
-            // Default emoji if no match found
-            if (!emoji) emoji = '😊';
-            
-            // Remove the bracket description from the display text
-            displayText = displayText.replace(emojiMatch[0], '').trim();
-        } else {
-            // It's an actual emoji character
-            emoji = emojiMatch[0];
-            // Remove it from the display text
-            displayText = displayText.replace(emojiMatch[0], '').trim();
-        }
+        // Just use the emoji or emoji description as-is
+        emoji = emojiMatch[0];
+        
+        // Remove the emoji from the display text
+        displayText = displayText.replace(emojiMatch[0], '').trim();
     }
     
     // Update emoji display
