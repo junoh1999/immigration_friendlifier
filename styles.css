@@ -269,3 +269,24 @@ title{
 .hidden {
     display: none !important;
 }
+
+/* Attention arrow styling */
+.attention-arrow {
+    display: inline-block;
+    color: #2A65AF;
+    font-weight: bold;
+    font-size: 40px;
+    margin-right: 10px;
+    vertical-align: middle;
+}
+
+/* Blinking animation for the arrow */
+@keyframes blink-arrow {
+    0% { opacity: 1; }
+    50% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+.blink-arrow {
+    animation: blink-arrow 0.5s 3;  /* Blink 3 times */
+}

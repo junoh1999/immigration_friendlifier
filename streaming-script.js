@@ -473,6 +473,8 @@ function displayTranscription(segments) {
 }
 
 // Display LLM analysis
+// Update the displayAnalysis function in streaming-script.js
+
 function displayAnalysis(analysisText) {
     if (!analysisEl) {
         console.log('Analysis element not found');
@@ -487,30 +489,105 @@ function displayAnalysis(analysisText) {
     
     console.log("Raw analysis text:", analysisText);
     
-    // Extract sections using the new format markers
-    const analysisParts = analysisText.split('---ANALYSIS---')[1]?.split('---EMOJI---')[0]?.trim() || '';
-    const emojiParts = analysisText.split('---EMOJI---')[1]?.split('---MESSAGE---')[0]?.trim() || '';
-    const messageParts = analysisText.split('---MESSAGE---')[1]?.trim() || '';
+    // Extract sections using the format markers (assuming you implemented the structured format)
+    // This code works with either the old or new format
     
-    // Get the first emoji if there are multiple
-    const emoji = emojiParts.trim() || '😊';
+    // Extract the analysis metadata and output sections
+    let consoleText = '';
+    let displayText = analysisText;
+    let emoji = '';
     
-    // Update UI elements
-    emojiDisplayEl.textContent = emoji;
-    analysisConsoleEl.textContent = analysisParts || 'No analysis metadata available';
+    // First, identify if there's an ---ANALYSIS--- marker (new format)
+    if (analysisText.includes('---ANALYSIS---')) {
+        const analysisParts = analysisText.split('---ANALYSIS---')[1]?.split('---EMOJI---')[0]?.trim() || '';
+        const emojiParts = analysisText.split('---EMOJI---')[1]?.split('---MESSAGE---')[0]?.trim() || '';
+        const messageParts = analysisText.split('---MESSAGE---')[1]?.trim() || '';
+        
+        consoleText = analysisParts;
+        displayText = messageParts;
+        emoji = emojiParts.trim();
+    }
+    else {
+        // Use the old parsing logic as fallback
+        const outputSplit = analysisText.split(/Output:/i);
+        
+        if (outputSplit.length > 1) {
+            consoleText = outputSplit[0].trim();
+            displayText = outputSplit[1].trim();
+        } else {
+            // If no Output: marker, try to separate based on common patterns
+            const analysisSplit = analysisText.match(/\*\*Analysis:\*\*([\s\S]*?)(?:\*\*|$)/i);
+            
+            if (analysisSplit) {
+                consoleText = analysisText;
+                
+                // Try to find the actual message after all the analysis sections
+                const messageParts = analysisText.split(/\*\*$/m);
+                if (messageParts.length > 1) {
+                    // Get the last non-empty part as the message
+                    for (let i = messageParts.length - 1; i >= 0; i--) {
+                        if (messageParts[i].trim()) {
+                            displayText = messageParts[i].trim();
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Extract emoji - look for it at the beginning of the display text
+        const emojiMatch = displayText.match(/^(\[[^\]]+\]|\p{Emoji_Presentation}|\p{Emoji}\uFE0F)/um);
+        
+        if (emojiMatch) {
+            emoji = emojiMatch[0];
+            displayText = displayText.replace(emojiMatch[0], '').trim();
+        } else {
+            // If no emoji at the start, check throughout the text
+            const anyEmojiMatch = displayText.match(/(\[[^\]]+\]|\p{Emoji_Presentation}|\p{Emoji}\uFE0F)/u);
+            if (anyEmojiMatch) {
+                emoji = anyEmojiMatch[0];
+                displayText = displayText.replace(anyEmojiMatch[0], '').trim();
+            }
+        }
+    }
     
-    // Display the message
+    // Update emoji display
+    emojiDisplayEl.textContent = emoji || '😊'; // Default emoji if none found
+    
+    // Update console display - keep the raw format including asterisks
+    analysisConsoleEl.textContent = consoleText || 'No analysis metadata available';
+    
+    // Hide welcome message when analysis is displayed
+    if (welcomeMessageEl) {
+        welcomeMessageEl.classList.add('hidden');
+    }
+    
+    // Update analysis content with clean text
     analysisEl.innerHTML = '';
-    if (messageParts) {
+    
+    // Add the display text with attention arrow
+    if (displayText.trim()) {
         const pEl = document.createElement('p');
-        pEl.textContent = messageParts;
+        
+        // Create and insert the attention arrow at the beginning of the text
+        const arrowSpan = document.createElement('span');
+        arrowSpan.className = 'attention-arrow blink-arrow';
+        arrowSpan.textContent = '>';
+        
+        pEl.appendChild(arrowSpan);
+        pEl.appendChild(document.createTextNode(' ' + displayText.trim()));
         analysisEl.appendChild(pEl);
+        
+        // Remove the blinking class after animation completes (approx 1.5s)
+        setTimeout(() => {
+            arrowSpan.classList.remove('blink-arrow');
+        }, 1500);
     }
     
     console.log("Processed analysis:", {
         emoji: emoji,
-        consoleText: analysisParts.substring(0, 100) + "...",
-        displayText: messageParts
+        consoleText: consoleText.substring(0, 100) + "...", // Log first 100 chars
+        displayText: displayText
     });
 }
 
