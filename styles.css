@@ -34,6 +34,11 @@ html, body {
     font-weight: 600;
 }
 
+.navbar-buttons {
+    display: flex;
+    gap: 8px;
+}
+
 /* Main content */
 .main-content {
     padding: 0;
@@ -50,7 +55,7 @@ html, body {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-/* Record button (circular) */
+/* Record and stop buttons (circular) */
 .record-btn-circle {
     width: 36px;
     height: 36px;
@@ -62,11 +67,33 @@ html, body {
     align-items: center;
     cursor: pointer;
     transition: background-color 0.3s;
+    font-size: 10px;
+}
+
+.stop-btn-circle {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: #888;
+    color: white;
+    border: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    font-size: 10px;
 }
 
 .record-btn-circle.recording {
     background-color: #ff3b30;
     animation: pulse 1.5s infinite;
+}
+
+.stop-btn-circle:disabled {
+    background-color: #ccc;
+    color: #888;
+    cursor: not-allowed;
 }
 
 @keyframes pulse {

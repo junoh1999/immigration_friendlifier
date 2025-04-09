@@ -10,7 +10,10 @@
     <!-- Navbar -->
     <header class="navbar">
         <div class="time">9:41 PM</div>
-        <button id="recordBtn" class="record-btn-circle"><img src="/api/placeholder/24/24" alt="microphone"></button>
+        <div class="navbar-buttons">
+            <button id="recordBtn" class="record-btn-circle">Rec</button>
+            <button id="stopBtn" class="stop-btn-circle">Stop</button>
+        </div>
     </header>
     
     <!-- Main content -->
@@ -51,9 +54,6 @@
             </div>
         </div>
     </main>
-    
-    <!-- Hidden stop button (will be shown/hidden via JS) -->
-    <button id="stopBtn" class="hidden">Stop Recording</button>
     
     <script src="streaming-script.js"></script>
 </body>
