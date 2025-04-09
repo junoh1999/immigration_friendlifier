@@ -175,10 +175,6 @@ async function startRecording() {
         recordBtn.classList.add('recording');
         isRecording = true;
         
-        // Show the below-fold section when recording starts
-        if (!isFoldVisible) {
-            toggleFold();
-        }
         
     } catch (error) {
         console.error('Error starting recording:', error);
